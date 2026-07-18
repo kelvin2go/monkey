@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Beckett Card Filter
 // @namespace    https://github.com/kelvin2go/card-script
-// @version      4.2.6
+// @version      4.2.7
 // @description  Collapsible sidebar — filter by box, player, team, tab, and card type
 // @author       kelvin2go
 // @match        https://www.beckett.com/news/*
@@ -296,8 +296,13 @@
         transition: border-color 0.15s;
       }
       .bk-select:focus { border-color: #e63c14; }
-      #bk-clear {
-        width: 100%;
+      #bk-filter-actions {
+        display: flex;
+        gap: 4px;
+        margin-top: 1px;
+      }
+      #bk-clear, #bk-save-default {
+        flex: 1;
         background: #2c2c2e;
         border: 1px solid #48484a;
         border-radius: 6px;
@@ -305,10 +310,11 @@
         font-size: 11px;
         padding: 5px;
         cursor: pointer;
-        margin-top: 1px;
         transition: all 0.15s;
       }
       #bk-clear:hover { border-color: #8e8e93; color: #f2f2f7; background: #3a3a3c; }
+      #bk-save-default:hover { border-color: #ffc130; color: #ffc130; background: #2a2200; }
+      #bk-save-default.has-default { border-color: #a07000; color: #ffc130; }
       #bk-summary {
         font-size: 11px;
         color: #636366;
@@ -630,7 +636,10 @@
             <span class="bk-filter-label">🎴 Type</span>
             <select id="bk-type-select" class="bk-select"><option value="">All types</option></select>
           </div>
-          <button id="bk-clear">✕ Clear filters</button>
+          <div id="bk-filter-actions">
+            <button id="bk-clear">✕ Clear</button>
+            <button id="bk-save-default">💾 Set default</button>
+          </div>
           <div id="bk-summary"></div>
         </div>
       </div>
@@ -879,6 +888,47 @@
     teamSelect.addEventListener('change', renderActive);
     typeSelect.addEventListener('change', renderActive);
 
+    const LS_KEY = 'bk-filter-default';
+    const saveDefaultBtn = sidebar.querySelector('#bk-save-default');
+
+    function loadDefault() {
+      try {
+        const saved = JSON.parse(localStorage.getItem(LS_KEY) || 'null');
+        if (!saved) return;
+        playerTags = saved.playerTags || [];
+        recentPlayers = saved.recentPlayers || [];
+        teamSelect.value = saved.team || '';
+        tabSelect.value = saved.tab || '';
+        // rebuild type options for the saved tab, then set type
+        if (saved.tab) {
+          const base = getBaseSections();
+          const rel = base.filter((s) => s.tabName === saved.tab);
+          rebuildTypeOptions(rel);
+        }
+        typeSelect.value = saved.type || '';
+        renderTags();
+        saveDefaultBtn.classList.add('has-default');
+        saveDefaultBtn.title = 'Default saved — click to update';
+      } catch (e) {}
+    }
+
+    function saveDefault() {
+      const cfg = {
+        playerTags: [...playerTags],
+        recentPlayers: [...recentPlayers],
+        team: teamSelect.value,
+        tab: tabSelect.value,
+        type: typeSelect.value,
+      };
+      localStorage.setItem(LS_KEY, JSON.stringify(cfg));
+      saveDefaultBtn.classList.add('has-default');
+      saveDefaultBtn.title = 'Default saved — click to update';
+      saveDefaultBtn.textContent = '✓ Saved';
+      setTimeout(() => { saveDefaultBtn.textContent = '💾 Set default'; }, 1200);
+    }
+
+    saveDefaultBtn.onclick = saveDefault;
+
     sidebar.querySelector('#bk-clear').onclick = () => {
       searchInput.value = '';
       playerTags = [];
@@ -889,6 +939,9 @@
       typeSelect.value = '';
       renderActive();
     };
+
+    // restore defaults after all controls are wired
+    loadDefault();
 
     const allTabs = [...new Set(sections.map((s) => s.tabName).filter(Boolean))];
 
