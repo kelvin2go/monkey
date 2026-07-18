@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Beckett Card Filter
 // @namespace    https://github.com/kelvin2go/card-script
-// @version      4.2.8
+// @version      4.2.9
 // @description  Collapsible sidebar — filter by box, player, team, tab, and card type
 // @author       kelvin2go
 // @match        https://www.beckett.com/news/*
@@ -901,8 +901,9 @@
         if (saved.boxType) {
           currentBoxType = saved.boxType;
           boxRow.querySelectorAll('.bk-box-btn').forEach((b) => {
-            b.classList.toggle('active', b.dataset.type === saved.boxType);
+            b.classList.toggle('active', b.textContent.trim() === saved.boxType);
           });
+          populateDropdowns();
         }
         teamSelect.value = saved.team || '';
         tabSelect.value = saved.tab || '';
