@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Beckett Card Filter
 // @namespace    https://github.com/kelvin2go/card-script
-// @version      4.1.5
+// @version      4.2.1
 // @description  Collapsible sidebar — filter by box, player, team, tab, and card type
 // @author       kelvin2go
 // @match        https://www.beckett.com/news/*
@@ -259,7 +259,7 @@
         font-size: 11px;
         font-weight: 500;
         color: #8e8e93;
-        width: 38px;
+        width: 58px;
         flex-shrink: 0;
       }
       #bk-search {
@@ -385,6 +385,8 @@
       .bk-card-team { color: #8e8e93; font-size: 11px; margin-left: auto; padding-left: 4px; }
       .bk-bd-table td.clickable:hover { color: #ff8c6e; text-decoration: underline; }
       .bk-card span[title]:hover { color: #ff8c6e; }
+      .bk-card span[title]:hover::after { content: ' ›'; color: #e63c14; font-weight: 700; }
+      .bk-bd-table td:first-child[title]:hover::after { content: ' ↗'; font-size: 10px; color: #e63c14; }
       .bk-empty { color: #636366; font-style: italic; font-size: 12px; padding: 16px 0; text-align: center; }
       #bk-player-box {
         flex: 1;
@@ -585,15 +587,15 @@
     sidebar.innerHTML = `
       <div id="bk-resize"></div>
       <div id="bk-sidebar-head">
-        <h2>Card Filter</h2>
+        <h2>🃏 Card Filter</h2>
         <div id="bk-view-tabs">
-          <button class="bk-view-tab active" data-view="results">Results</button>
-          <button class="bk-view-tab" data-view="breakdown">Breakdown</button>
+          <button class="bk-view-tab active" data-view="results">📋 Results</button>
+          <button class="bk-view-tab" data-view="breakdown">📊 Breakdown</button>
         </div>
         <div class="bk-box-row" id="bk-box-row"></div>
         <div id="bk-filters">
           <div class="bk-filter-row" style="align-items:flex-start">
-            <span class="bk-filter-label" style="padding-top:5px">Player</span>
+            <span class="bk-filter-label" style="padding-top:5px">👤 Player</span>
             <div id="bk-player-box">
               <div id="bk-player-tags"></div>
               <div id="bk-player-input-wrap">
@@ -603,18 +605,18 @@
             </div>
           </div>
           <div class="bk-filter-row">
-            <span class="bk-filter-label">Team</span>
+            <span class="bk-filter-label">🏀 Team</span>
             <select id="bk-team-select" class="bk-select"><option value="">All teams</option></select>
           </div>
           <div class="bk-filter-row">
-            <span class="bk-filter-label">Tab</span>
+            <span class="bk-filter-label">📂 Tab</span>
             <select id="bk-tab-select" class="bk-select"><option value="">All tabs</option></select>
           </div>
           <div class="bk-filter-row">
-            <span class="bk-filter-label">Type</span>
+            <span class="bk-filter-label">🎴 Type</span>
             <select id="bk-type-select" class="bk-select"><option value="">All types</option></select>
           </div>
-          <button id="bk-clear">Clear filters</button>
+          <button id="bk-clear">✕ Clear filters</button>
           <div id="bk-summary"></div>
         </div>
       </div>
@@ -622,7 +624,7 @@
       <div id="bk-breakdown-area">
         <div class="bk-bd-actions">
           <button id="bk-snap-btn">📸 Snapshot</button>
-          <button id="bk-compare-btn">Compare</button>
+          <button id="bk-compare-btn">⚖️ Compare</button>
           <span class="bk-snap-label" id="bk-snap-label"></span>
         </div>
         <div id="bk-compare-selects">
@@ -711,7 +713,7 @@
           boxRow.querySelectorAll('.bk-box-btn').forEach((b) => b.classList.remove('active'));
           btn.classList.add('active');
           populateDropdowns();
-          render();
+          renderActive();
         };
         boxRow.appendChild(btn);
       });
@@ -762,7 +764,7 @@
       const relevantSections = selectedTab ? base.filter((s) => s.tabName === selectedTab) : base;
       rebuildTypeOptions(relevantSections);
       typeSelect.value = '';
-      render();
+      renderActive();
     });
 
     // ── Player tag system ──
@@ -781,7 +783,7 @@
         const x = document.createElement('button');
         x.textContent = '×';
         x.title = 'Remove';
-        x.onclick = () => { playerTags = playerTags.filter(p => p !== name); renderTags(); render(); };
+        x.onclick = () => { playerTags = playerTags.filter(p => p !== name); renderTags(); renderActive(); };
         chip.appendChild(x);
         tagsEl.appendChild(chip);
       });
@@ -810,7 +812,7 @@
           searchInput.value = '';
           acEl.innerHTML = '';
           renderTags();
-          render();
+          renderActive();
         };
         acEl.appendChild(item);
       });
@@ -822,16 +824,16 @@
       clearTimeout(searchTimer);
       searchTimer = setTimeout(() => {
         showAutocomplete(searchInput.value.trim());
-        render();
+        renderActive();
       }, 120);
     });
     searchInput.addEventListener('blur', () => setTimeout(() => { acEl.innerHTML = ''; }, 150));
     searchInput.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape') { acEl.innerHTML = ''; searchInput.value = ''; render(); }
+      if (e.key === 'Escape') { acEl.innerHTML = ''; searchInput.value = ''; renderActive(); }
     });
 
-    teamSelect.addEventListener('change', render);
-    typeSelect.addEventListener('change', render);
+    teamSelect.addEventListener('change', renderActive);
+    typeSelect.addEventListener('change', renderActive);
 
     sidebar.querySelector('#bk-clear').onclick = () => {
       searchInput.value = '';
@@ -841,7 +843,7 @@
       teamSelect.value = '';
       tabSelect.value = '';
       typeSelect.value = '';
-      render();
+      renderActive();
     };
 
     const allTabs = [...new Set(sections.map((s) => s.tabName).filter(Boolean))];
@@ -1129,7 +1131,7 @@
 
     function applyCompareMode() {
       cmpSelects.classList.toggle('active', compareMode);
-      compareBtn.textContent = compareMode ? 'Live' : 'Compare';
+      compareBtn.textContent = compareMode ? '📋 Live' : '⚖️ Compare';
       compareBtn.style.background = compareMode ? '#3a1c1c' : '';
       compareBtn.style.borderColor = compareMode ? '#e63c14' : '';
       compareBtn.style.color = compareMode ? '#ff6b47' : '';
@@ -1156,6 +1158,11 @@
 
     [cmpA, cmpB].forEach(sel => sel.addEventListener('change', renderBreakdown));
 
+    function renderActive() {
+      render();
+      if (currentView === 'breakdown') renderBreakdown();
+    }
+
     function render() {
       const query = searchInput.value.trim().toLowerCase();
       const teamFilter = teamSelect.value;
@@ -1181,7 +1188,7 @@
         .filter((s) => s.visibleCards.length > 0);
 
       const totalCards = filtered.reduce((n, s) => n + s.visibleCards.length, 0);
-      summaryEl.innerHTML = `<strong style="color:#aaa">${filtered.length}</strong> sets · <strong style="color:#${hasFilters ? 'e63c14' : 'aaa'}">${totalCards}</strong> cards${hasFilters ? ' matching' : ''}`;
+      summaryEl.innerHTML = `📦 <strong style="color:#aaa">${filtered.length}</strong> sets &nbsp;🃏 <strong style="color:#${hasFilters ? 'e63c14' : 'aaa'}">${totalCards}</strong> cards${hasFilters ? ' matching' : ''}`;
 
       resultsEl.innerHTML = '';
       if (filtered.length === 0) {
@@ -1218,7 +1225,7 @@
         const meta = document.createElement('div');
         meta.className = 'bk-set-meta';
         const showing = s.visibleCards.length < s.cards.length ? `${s.visibleCards.length}/${s.cards.length}` : `${s.cards.length}`;
-        meta.textContent = oddsPerPack ? `1:${oddsPerPack.toLocaleString()} packs · ${showing} cards` : `${showing} cards`;
+        meta.textContent = oddsPerPack ? `🎲 1:${oddsPerPack.toLocaleString()} packs · 🃏 ${showing}` : `🃏 ${showing} cards`;
 
         const cardsEl = document.createElement('div');
         cardsEl.className = 'bk-cards';
