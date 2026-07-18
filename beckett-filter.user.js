@@ -4,6 +4,7 @@
 // @version      4.3.0
 // @description  Collapsible sidebar — filter by box, player, team, tab, and card type
 // @author       kelvin2go
+// @license      MIT
 // @match        https://www.beckett.com/news/*
 // @updateURL    https://raw.githubusercontent.com/kelvin2go/card-script/main/beckett-filter.user.js
 // @downloadURL  https://raw.githubusercontent.com/kelvin2go/card-script/main/beckett-filter.user.js
