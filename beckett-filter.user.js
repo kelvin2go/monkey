@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Beckett Card Filter
 // @namespace    https://github.com/kelvin2go/card-script
-// @version      4.2.4
+// @version      4.2.5
 // @description  Collapsible sidebar — filter by box, player, team, tab, and card type
 // @author       kelvin2go
 // @match        https://www.beckett.com/news/*
@@ -864,6 +864,8 @@
     const bdAcEl = sidebar.querySelector('#bk-bd-autocomplete');
     // bdPlayerTags: Map<name, colorIndex>
     let bdPlayerTags = new Map();
+    let bdSortCol = null; // null = alpha by player, 'total', or tabCol name
+    let bdSortDir = 1;    // 1 = desc, -1 = asc
     const BD_TAG_PALETTE = [
       { bg: '#2d1a0e', border: '#c85a1a', text: '#ff8c6e' }, // orange
       { bg: '#0d1f35', border: '#1e5fa0', text: '#5aadff' }, // blue
@@ -983,6 +985,20 @@
         players = players.filter(p => p.toLowerCase().includes(lq));
       }
 
+      // sort by column (pinned players always stay on top)
+      if (bdSortCol) {
+        const pinnedSet = new Set(bdPlayerTags.size > 0 ? [...bdPlayerTags.keys()].filter(p => playerMap[p] || (compareSnap && compareSnap.playerMap[p])) : []);
+        const sortFn = (a, b) => {
+          if (pinnedSet.has(a) !== pinnedSet.has(b)) return pinnedSet.has(a) ? -1 : 1;
+          if (bdSortCol === 'player') return a.localeCompare(b) * bdSortDir;
+          const getVal = (p) => bdSortCol === 'total'
+            ? tabCols.reduce((n, c) => n + (playerMap[p][c] || 0), 0)
+            : (playerMap[p][bdSortCol] || 0);
+          return (getVal(b) - getVal(a)) * bdSortDir;
+        };
+        players = [...players].sort(sortFn);
+      }
+
       if (players.length === 0) {
         bdTableWrap.innerHTML = '<div class="bk-empty">No players.</div>';
         return;
@@ -991,21 +1007,36 @@
       const table = document.createElement('table');
       table.className = 'bk-bd-table';
 
+      const makeTh = (label, colKey, extraCss) => {
+        const th = document.createElement('th');
+        const isActive = bdSortCol === colKey;
+        const arrow = isActive ? (bdSortDir === 1 ? ' ▼' : ' ▲') : '';
+        th.textContent = label + arrow;
+        th.style.cursor = 'pointer';
+        th.style.userSelect = 'none';
+        if (isActive) th.style.color = '#ffc130';
+        if (extraCss) th.style.cssText += extraCss;
+        th.addEventListener('click', () => {
+          if (bdSortCol === colKey) {
+            bdSortDir = bdSortDir === 1 ? -1 : 1;
+          } else {
+            bdSortCol = colKey;
+            bdSortDir = colKey === 'player' ? -1 : 1; // player: A→Z first; counts: high→low first
+          }
+          renderBreakdown();
+        });
+        return th;
+      };
+
       const thead = table.createTHead();
       const hrow = thead.insertRow();
-      const thName = document.createElement('th');
-      thName.textContent = 'Player';
-      hrow.appendChild(thName);
+      hrow.appendChild(makeTh('Player', 'player'));
       tabCols.forEach((col) => {
-        const th = document.createElement('th');
-        th.textContent = col.replace(/autographs/i, 'Auto').replace(/inserts/i, 'Ins').replace(/memorabilia/i, 'Mem');
-        hrow.appendChild(th);
+        const label = col.replace(/autographs/i, 'Auto').replace(/inserts/i, 'Ins').replace(/memorabilia/i, 'Mem');
+        hrow.appendChild(makeTh(label, col));
       });
       if (tabCols.length > 1) {
-        const thTotal = document.createElement('th');
-        thTotal.textContent = 'Total';
-        thTotal.style.cssText = 'color:#f2f2f7;border-left:1px solid #3a3a3c';
-        hrow.appendChild(thTotal);
+        hrow.appendChild(makeTh('Total', 'total', ';border-left:1px solid #3a3a3c'));
       }
 
       const tbody = table.createTBody();
