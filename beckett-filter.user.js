@@ -1,10 +1,12 @@
 // ==UserScript==
 // @name         Beckett Card Filter
 // @namespace    https://github.com/kelvin2go/card-script
-// @version      4.2.1
+// @version      4.2.3
 // @description  Collapsible sidebar — filter by box, player, team, tab, and card type
 // @author       kelvin2go
 // @match        https://www.beckett.com/news/*
+// @updateURL    https://raw.githubusercontent.com/kelvin2go/card-script/main/beckett-filter.user.js
+// @downloadURL  https://raw.githubusercontent.com/kelvin2go/card-script/main/beckett-filter.user.js
 // @grant        GM_addStyle
 // @run-at       document-idle
 // ==/UserScript==
@@ -830,6 +832,10 @@
     searchInput.addEventListener('blur', () => setTimeout(() => { acEl.innerHTML = ''; }, 150));
     searchInput.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') { acEl.innerHTML = ''; searchInput.value = ''; renderActive(); }
+      if (e.key === 'Enter') {
+        const first = acEl.querySelector('.bk-ac-item');
+        if (first) { e.preventDefault(); first.dispatchEvent(new MouseEvent('mousedown', { bubbles: true })); }
+      }
     });
 
     teamSelect.addEventListener('change', renderActive);
@@ -984,6 +990,12 @@
         th.textContent = col.replace(/autographs/i, 'Auto').replace(/inserts/i, 'Ins').replace(/memorabilia/i, 'Mem');
         hrow.appendChild(th);
       });
+      if (tabCols.length > 1) {
+        const thTotal = document.createElement('th');
+        thTotal.textContent = 'Total';
+        thTotal.style.cssText = 'color:#f2f2f7;border-left:1px solid #3a3a3c';
+        hrow.appendChild(thTotal);
+      }
 
       const tbody = table.createTBody();
       const tagSet = new Set(bdPlayerTags);
@@ -994,7 +1006,7 @@
           const sep = tbody.insertRow();
           sep.style.cssText = 'height:1px;background:#3a3a3c;pointer-events:none';
           const td = sep.insertCell();
-          td.colSpan = tabCols.length + 1;
+          td.colSpan = tabCols.length + (tabCols.length > 1 ? 2 : 1);
           td.style.cssText = 'padding:0;background:#3a3a3c';
         }
         const row = tbody.insertRow();
@@ -1035,6 +1047,34 @@
             }
           }
         });
+
+        if (tabCols.length > 1) {
+          const tdTotal = row.insertCell();
+          tdTotal.style.cssText = 'border-left:1px solid #3a3a3c;text-align:center;font-weight:700';
+          if (compareSnap) {
+            const totalB = tabCols.reduce((n, c) => n + (playerMap[player][c] || 0), 0);
+            const totalA = tabCols.reduce((n, c) => n + ((compareSnap.playerMap[player] || {})[c] || 0), 0);
+            const delta = totalB - totalA;
+            if (totalB === 0 && totalA === 0) {
+              tdTotal.textContent = '—';
+              tdTotal.style.color = '#48484a';
+            } else {
+              tdTotal.style.color = '#ffc130';
+              tdTotal.textContent = totalB;
+              if (delta > 0) tdTotal.innerHTML += ` <span class="bk-cmp-gain">+${delta}</span>`;
+              else if (delta < 0) tdTotal.innerHTML += ` <span class="bk-cmp-loss">${delta}</span>`;
+            }
+          } else {
+            const total = tabCols.reduce((n, c) => n + (playerMap[player][c] || 0), 0);
+            if (total > 0) {
+              tdTotal.textContent = total;
+              tdTotal.style.color = '#ffc130';
+            } else {
+              tdTotal.textContent = '—';
+              tdTotal.style.color = '#48484a';
+            }
+          }
+        }
 
         if (compareSnap && !hasDiff) row.classList.add('no-diff');
       });
@@ -1113,6 +1153,10 @@
     bdSearchEl.addEventListener('blur', () => setTimeout(() => { bdAcEl.innerHTML = ''; }, 150));
     bdSearchEl.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') { bdAcEl.innerHTML = ''; bdSearchEl.value = ''; renderBreakdown(); }
+      if (e.key === 'Enter') {
+        const first = bdAcEl.querySelector('.bk-ac-item');
+        if (first) { e.preventDefault(); first.dispatchEvent(new MouseEvent('mousedown', { bubbles: true })); }
+      }
     });
 
     snapBtn.addEventListener('click', () => {
