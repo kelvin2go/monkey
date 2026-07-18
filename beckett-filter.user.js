@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Beckett Card Filter
 // @namespace    https://github.com/kelvin2go/card-script
-// @version      4.2.5
+// @version      4.2.6
 // @description  Collapsible sidebar — filter by box, player, team, tab, and card type
 // @author       kelvin2go
 // @match        https://www.beckett.com/news/*
@@ -428,6 +428,18 @@
         line-height: 1;
         flex-shrink: 0;
       }
+      .bk-recent-tag {
+        background: #1e1e1e;
+        border-color: #48484a;
+        color: #636366;
+        cursor: pointer;
+        opacity: 0.75;
+      }
+      .bk-recent-tag:hover {
+        border-color: #888;
+        color: #aaa;
+        opacity: 1;
+      }
       #bk-player-input-wrap { position: relative; }
       #bk-search {
         width: 100%;
@@ -773,11 +785,17 @@
     const tagsEl = sidebar.querySelector('#bk-player-tags');
     const acEl = sidebar.querySelector('#bk-autocomplete');
     let playerTags = [];
+    let recentPlayers = []; // last 5 used, greyed when not active
 
     const allPlayers = [...new Set(sections.flatMap(s => s.cards.map(c => c.player)).filter(Boolean))].sort();
 
+    function trackRecent(name) {
+      recentPlayers = [name, ...recentPlayers.filter(p => p !== name)].slice(0, 5);
+    }
+
     function renderTags() {
       tagsEl.innerHTML = '';
+      // active tags
       playerTags.forEach((name) => {
         const chip = document.createElement('span');
         chip.className = 'bk-player-tag';
@@ -789,6 +807,25 @@
         chip.appendChild(x);
         tagsEl.appendChild(chip);
       });
+      // recent (greyed, not yet active)
+      const inactiveRecent = recentPlayers.filter(p => !playerTags.includes(p));
+      if (inactiveRecent.length > 0) {
+        const sep = document.createElement('span');
+        sep.style.cssText = 'display:inline-block;width:1px;height:14px;background:#3a3a3c;margin:0 4px;vertical-align:middle';
+        tagsEl.appendChild(sep);
+        inactiveRecent.forEach((name) => {
+          const chip = document.createElement('span');
+          chip.className = 'bk-player-tag bk-recent-tag';
+          chip.title = 'Click to activate';
+          chip.textContent = name;
+          chip.onclick = () => {
+            playerTags.push(name);
+            renderTags();
+            renderActive();
+          };
+          tagsEl.appendChild(chip);
+        });
+      }
     }
 
     function positionAc(acDropdown, inputEl) {
@@ -810,6 +847,7 @@
         item.innerHTML = name.slice(0, idx) + '<em>' + name.slice(idx, idx + q.length) + '</em>' + name.slice(idx + q.length);
         item.onmousedown = (e) => {
           e.preventDefault();
+          trackRecent(name);
           playerTags.push(name);
           searchInput.value = '';
           acEl.innerHTML = '';
@@ -892,6 +930,7 @@
 
     function goToResultsWithPlayer(playerName) {
       if (!playerTags.includes(playerName)) {
+        trackRecent(playerName);
         playerTags.push(playerName);
         renderTags();
       }
@@ -902,6 +941,7 @@
 
     function goToResultsWithPlayerAndTab(playerName, tabName) {
       if (!playerTags.includes(playerName)) {
+        trackRecent(playerName);
         playerTags.push(playerName);
         renderTags();
       }
