@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Beckett Card Filter
 // @namespace    https://github.com/kelvin2go/card-script
-// @version      4.2.7
+// @version      4.2.8
 // @description  Collapsible sidebar — filter by box, player, team, tab, and card type
 // @author       kelvin2go
 // @match        https://www.beckett.com/news/*
@@ -895,18 +895,30 @@
       try {
         const saved = JSON.parse(localStorage.getItem(LS_KEY) || 'null');
         if (!saved) return;
+        // results filters
         playerTags = saved.playerTags || [];
         recentPlayers = saved.recentPlayers || [];
+        if (saved.boxType) {
+          currentBoxType = saved.boxType;
+          boxRow.querySelectorAll('.bk-box-btn').forEach((b) => {
+            b.classList.toggle('active', b.dataset.type === saved.boxType);
+          });
+        }
         teamSelect.value = saved.team || '';
         tabSelect.value = saved.tab || '';
-        // rebuild type options for the saved tab, then set type
         if (saved.tab) {
           const base = getBaseSections();
-          const rel = base.filter((s) => s.tabName === saved.tab);
-          rebuildTypeOptions(rel);
+          rebuildTypeOptions(base.filter((s) => s.tabName === saved.tab));
         }
         typeSelect.value = saved.type || '';
         renderTags();
+        // breakdown state
+        if (saved.bdPlayerTags) {
+          bdPlayerTags = new Map(saved.bdPlayerTags);
+          renderBdTags();
+        }
+        if (saved.bdSortCol !== undefined) bdSortCol = saved.bdSortCol;
+        if (saved.bdSortDir !== undefined) bdSortDir = saved.bdSortDir;
         saveDefaultBtn.classList.add('has-default');
         saveDefaultBtn.title = 'Default saved — click to update';
       } catch (e) {}
@@ -916,9 +928,13 @@
       const cfg = {
         playerTags: [...playerTags],
         recentPlayers: [...recentPlayers],
+        boxType: currentBoxType,
         team: teamSelect.value,
         tab: tabSelect.value,
         type: typeSelect.value,
+        bdPlayerTags: [...bdPlayerTags.entries()],
+        bdSortCol,
+        bdSortDir,
       };
       localStorage.setItem(LS_KEY, JSON.stringify(cfg));
       saveDefaultBtn.classList.add('has-default');
@@ -939,9 +955,6 @@
       typeSelect.value = '';
       renderActive();
     };
-
-    // restore defaults after all controls are wired
-    loadDefault();
 
     const allTabs = [...new Set(sections.map((s) => s.tabName).filter(Boolean))];
 
@@ -1363,6 +1376,9 @@
       render();
       if (currentView === 'breakdown') renderBreakdown();
     }
+
+    // restore defaults now that all state vars and render fns are declared
+    loadDefault();
 
     function render() {
       const query = searchInput.value.trim().toLowerCase();
