@@ -171,6 +171,95 @@ assert('rate >= 1 shows multiplier', hitRate(6, 24), '~4.0x / box');
 assert('rate < 1 shows per-box', hitRate(100, 24), '1 per 4 boxes');
 assert('rate exactly 1', hitRate(24, 24), '~1.0x / box');
 
+// ── autocomplete filtering ────────────────────────────────────────────────────
+console.log('\nautocomplete filtering');
+
+function filterAutocomplete(allPlayers, query, tags) {
+  if (!query) return [];
+  const lq = query.toLowerCase();
+  return allPlayers.filter(p => p.toLowerCase().includes(lq) && !tags.includes(p)).slice(0, 12);
+}
+
+const PLAYERS = ['Anthony Edwards', 'Ace Bailey', 'Queen James', 'LeBron James', 'Jayson Tatum'];
+
+assert('basic match "queen"',
+  filterAutocomplete(PLAYERS, 'queen', []),
+  ['Queen James']);
+
+assert('case-insensitive "QUEEN"',
+  filterAutocomplete(PLAYERS, 'QUEEN', []),
+  ['Queen James']);
+
+assert('mid-name match "james"',
+  filterAutocomplete(PLAYERS, 'james', []),
+  ['Queen James', 'LeBron James']);
+
+assert('empty query returns nothing',
+  filterAutocomplete(PLAYERS, '', []),
+  []);
+
+assert('already-tagged player excluded',
+  filterAutocomplete(PLAYERS, 'james', ['Queen James']),
+  ['LeBron James']);
+
+assert('multiple tags excluded',
+  filterAutocomplete(PLAYERS, 'james', ['Queen James', 'LeBron James']),
+  []);
+
+assert('no match returns empty',
+  filterAutocomplete(PLAYERS, 'curry', []),
+  []);
+
+// ── buildBreakdownData ────────────────────────────────────────────────────────
+console.log('\nbuildBreakdownData');
+
+function buildBreakdownData(sourceSections) {
+  const tabCols = [...new Set(sourceSections.map(s => s.tabName))];
+  const playerMap = {};
+  sourceSections.forEach((s) => {
+    s.cards.forEach((c) => {
+      if (!c.player) return;
+      if (!playerMap[c.player]) playerMap[c.player] = {};
+      playerMap[c.player][s.tabName] = (playerMap[c.player][s.tabName] || 0) + 1;
+    });
+  });
+  return { tabCols, playerMap };
+}
+
+const fakeSections = [
+  { tabName: 'Autographs', cards: [
+    { player: 'Anthony Edwards', team: 'Timberwolves' },
+    { player: 'Ace Bailey', team: 'Jazz' },
+    { player: 'Anthony Edwards', team: 'Timberwolves' },
+  ]},
+  { tabName: 'Inserts', cards: [
+    { player: 'Anthony Edwards', team: 'Timberwolves' },
+    { player: 'LeBron James', team: 'Lakers' },
+  ]},
+];
+
+const bd = buildBreakdownData(fakeSections);
+
+assert('tabCols from sections',
+  bd.tabCols,
+  ['Autographs', 'Inserts']);
+
+assert('player count Auto',
+  bd.playerMap['Anthony Edwards']['Autographs'],
+  2);
+
+assert('player count Ins',
+  bd.playerMap['Anthony Edwards']['Inserts'],
+  1);
+
+assert('player with only one tab',
+  bd.playerMap['Ace Bailey'],
+  { Autographs: 1 });
+
+assert('player absent from tab is undefined (not 0)',
+  bd.playerMap['LeBron James']['Autographs'],
+  undefined);
+
 // ── Summary ───────────────────────────────────────────────────────────────────
 console.log(`\n${passed + failed} tests: ${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);

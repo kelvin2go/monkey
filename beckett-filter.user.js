@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Beckett Card Filter
 // @namespace    https://github.com/kelvin2go/card-script
-// @version      4.1.4
+// @version      4.1.5
 // @description  Collapsible sidebar — filter by box, player, team, tab, and card type
 // @author       kelvin2go
 // @match        https://www.beckett.com/news/*
@@ -440,10 +440,7 @@
       #bk-search:focus { border-color: #e63c14; background: #313133; }
       #bk-search::placeholder { color: #636366; }
       #bk-autocomplete {
-        position: absolute;
-        top: calc(100% + 2px);
-        left: 0;
-        right: 0;
+        position: fixed;
         background: #2c2c2e;
         border: 1px solid #48484a;
         border-radius: 6px;
@@ -557,7 +554,7 @@
       #bk-bd-player-input-wrap { position: relative; margin-bottom: 8px; }
       #bk-breakdown-search { margin-bottom: 0; }
       #bk-bd-autocomplete {
-        position: absolute; top: calc(100% + 2px); left: 0; right: 0;
+        position: fixed;
         background: #2c2c2e; border: 1px solid #48484a; border-radius: 6px;
         z-index: 10002; max-height: 160px; overflow-y: auto;
         box-shadow: 0 4px 12px rgba(0,0,0,0.5);
@@ -790,6 +787,13 @@
       });
     }
 
+    function positionAc(acDropdown, inputEl) {
+      const r = inputEl.getBoundingClientRect();
+      acDropdown.style.top = (r.bottom + 2) + 'px';
+      acDropdown.style.left = r.left + 'px';
+      acDropdown.style.width = r.width + 'px';
+    }
+
     function showAutocomplete(q) {
       acEl.innerHTML = '';
       if (!q) return;
@@ -810,6 +814,7 @@
         };
         acEl.appendChild(item);
       });
+      positionAc(acEl, searchInput);
     }
 
     let searchTimer;
@@ -1096,6 +1101,7 @@
         };
         bdAcEl.appendChild(item);
       });
+      positionAc(bdAcEl, bdSearchEl);
     }
 
     bdSearchEl.addEventListener('input', () => {
