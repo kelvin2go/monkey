@@ -260,6 +260,115 @@ assert('player absent from tab is undefined (not 0)',
   bd.playerMap['LeBron James']['Autographs'],
   undefined);
 
+// ── serializeConfig / deserializeConfig ──────────────────────────────────────
+console.log('\nserializeConfig / deserializeConfig');
+
+function serializeConfig(state) {
+  return {
+    playerTags:   [...state.playerTags],
+    recentPlayers:[...state.recentPlayers],
+    boxType:      state.boxType,
+    team:         state.team,
+    tab:          state.tab,
+    type:         state.type,
+    bdPlayerTags: [...state.bdPlayerTags.entries()],
+    bdSortCol:    state.bdSortCol,
+    bdSortDir:    state.bdSortDir,
+  };
+}
+
+function deserializeConfig(raw) {
+  if (!raw || typeof raw !== 'object') return null;
+  return {
+    playerTags:   Array.isArray(raw.playerTags)    ? raw.playerTags    : [],
+    recentPlayers:Array.isArray(raw.recentPlayers)  ? raw.recentPlayers : [],
+    boxType:      typeof raw.boxType === 'string'   ? raw.boxType       : null,
+    team:         raw.team  || '',
+    tab:          raw.tab   || '',
+    type:         raw.type  || '',
+    bdPlayerTags: new Map(Array.isArray(raw.bdPlayerTags) ? raw.bdPlayerTags : []),
+    bdSortCol:    raw.bdSortCol !== undefined ? raw.bdSortCol : null,
+    bdSortDir:    typeof raw.bdSortDir === 'number' ? raw.bdSortDir : 1,
+  };
+}
+
+const fullState = {
+  playerTags:    ['Ace Bailey', 'LeBron James'],
+  recentPlayers: ['Ace Bailey', 'Ja Morant'],
+  boxType:       'Value',
+  team:          'Lakers',
+  tab:           'Autographs',
+  type:          'Autographs::Rookie Auto',
+  bdPlayerTags:  new Map([['Ace Bailey', 2], ['Ja Morant', 0]]),
+  bdSortCol:     'total',
+  bdSortDir:     -1,
+};
+
+const serialized = serializeConfig(fullState);
+const roundtrip  = deserializeConfig(JSON.parse(JSON.stringify(serialized)));
+
+assert('roundtrip playerTags',
+  roundtrip.playerTags,
+  ['Ace Bailey', 'LeBron James']);
+
+assert('roundtrip recentPlayers',
+  roundtrip.recentPlayers,
+  ['Ace Bailey', 'Ja Morant']);
+
+assert('roundtrip boxType',
+  roundtrip.boxType,
+  'Value');
+
+assert('roundtrip team/tab/type',
+  [roundtrip.team, roundtrip.tab, roundtrip.type],
+  ['Lakers', 'Autographs', 'Autographs::Rookie Auto']);
+
+assert('roundtrip bdPlayerTags as Map',
+  roundtrip.bdPlayerTags instanceof Map &&
+  roundtrip.bdPlayerTags.get('Ace Bailey') === 2 &&
+  roundtrip.bdPlayerTags.get('Ja Morant') === 0,
+  true);
+
+assert('roundtrip bdSortCol + bdSortDir',
+  [roundtrip.bdSortCol, roundtrip.bdSortDir],
+  ['total', -1]);
+
+// bdPlayerTags serialized as entries array (JSON-safe)
+assert('serialized bdPlayerTags is array',
+  Array.isArray(serialized.bdPlayerTags),
+  true);
+
+assert('serialized bdPlayerTags entries',
+  serialized.bdPlayerTags,
+  [['Ace Bailey', 2], ['Ja Morant', 0]]);
+
+// deserializeConfig handles missing/null gracefully
+const empty = deserializeConfig(null);
+assert('null input returns null',
+  empty,
+  null);
+
+const partial = deserializeConfig({ boxType: 'Hobby' });
+assert('partial: playerTags defaults to []',
+  partial.playerTags,
+  []);
+
+assert('partial: bdPlayerTags defaults to empty Map',
+  partial.bdPlayerTags instanceof Map && partial.bdPlayerTags.size === 0,
+  true);
+
+assert('partial: bdSortDir defaults to 1',
+  partial.bdSortDir,
+  1);
+
+assert('partial: boxType preserved',
+  partial.boxType,
+  'Hobby');
+
+assert('partial: missing bdSortCol defaults to null',
+  partial.bdSortCol,
+  null);
+
 // ── Summary ───────────────────────────────────────────────────────────────────
 console.log(`\n${passed + failed} tests: ${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);

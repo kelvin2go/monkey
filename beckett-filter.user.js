@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Beckett Card Filter
 // @namespace    https://github.com/kelvin2go/card-script
-// @version      4.2.9
+// @version      4.3.0
 // @description  Collapsible sidebar — filter by box, player, team, tab, and card type
 // @author       kelvin2go
 // @match        https://www.beckett.com/news/*
@@ -891,52 +891,73 @@
     const LS_KEY = 'bk-filter-default';
     const saveDefaultBtn = sidebar.querySelector('#bk-save-default');
 
+    function serializeConfig(state) {
+      return {
+        playerTags:   [...state.playerTags],
+        recentPlayers:[...state.recentPlayers],
+        boxType:      state.boxType,
+        team:         state.team,
+        tab:          state.tab,
+        type:         state.type,
+        bdPlayerTags: [...state.bdPlayerTags.entries()],
+        bdSortCol:    state.bdSortCol,
+        bdSortDir:    state.bdSortDir,
+      };
+    }
+
+    function deserializeConfig(raw) {
+      if (!raw || typeof raw !== 'object') return null;
+      return {
+        playerTags:   Array.isArray(raw.playerTags)    ? raw.playerTags    : [],
+        recentPlayers:Array.isArray(raw.recentPlayers)  ? raw.recentPlayers : [],
+        boxType:      typeof raw.boxType === 'string'   ? raw.boxType       : null,
+        team:         raw.team  || '',
+        tab:          raw.tab   || '',
+        type:         raw.type  || '',
+        bdPlayerTags: new Map(Array.isArray(raw.bdPlayerTags) ? raw.bdPlayerTags : []),
+        bdSortCol:    raw.bdSortCol !== undefined ? raw.bdSortCol : null,
+        bdSortDir:    typeof raw.bdSortDir === 'number' ? raw.bdSortDir : 1,
+      };
+    }
+
     function loadDefault() {
       try {
-        const saved = JSON.parse(localStorage.getItem(LS_KEY) || 'null');
-        if (!saved) return;
-        // results filters
-        playerTags = saved.playerTags || [];
-        recentPlayers = saved.recentPlayers || [];
-        if (saved.boxType) {
-          currentBoxType = saved.boxType;
+        const cfg = deserializeConfig(JSON.parse(localStorage.getItem(LS_KEY) || 'null'));
+        if (!cfg) return;
+        playerTags    = cfg.playerTags;
+        recentPlayers = cfg.recentPlayers;
+        if (cfg.boxType) {
+          currentBoxType = cfg.boxType;
           boxRow.querySelectorAll('.bk-box-btn').forEach((b) => {
-            b.classList.toggle('active', b.textContent.trim() === saved.boxType);
+            b.classList.toggle('active', b.textContent.trim() === cfg.boxType);
           });
           populateDropdowns();
         }
-        teamSelect.value = saved.team || '';
-        tabSelect.value = saved.tab || '';
-        if (saved.tab) {
+        teamSelect.value = cfg.team;
+        tabSelect.value  = cfg.tab;
+        if (cfg.tab) {
           const base = getBaseSections();
-          rebuildTypeOptions(base.filter((s) => s.tabName === saved.tab));
+          rebuildTypeOptions(base.filter((s) => s.tabName === cfg.tab));
         }
-        typeSelect.value = saved.type || '';
+        typeSelect.value = cfg.type;
         renderTags();
-        // breakdown state
-        if (saved.bdPlayerTags) {
-          bdPlayerTags = new Map(saved.bdPlayerTags);
+        if (cfg.bdPlayerTags.size > 0) {
+          bdPlayerTags = cfg.bdPlayerTags;
           renderBdTags();
         }
-        if (saved.bdSortCol !== undefined) bdSortCol = saved.bdSortCol;
-        if (saved.bdSortDir !== undefined) bdSortDir = saved.bdSortDir;
+        bdSortCol = cfg.bdSortCol;
+        bdSortDir = cfg.bdSortDir;
         saveDefaultBtn.classList.add('has-default');
         saveDefaultBtn.title = 'Default saved — click to update';
       } catch (e) {}
     }
 
     function saveDefault() {
-      const cfg = {
-        playerTags: [...playerTags],
-        recentPlayers: [...recentPlayers],
-        boxType: currentBoxType,
-        team: teamSelect.value,
-        tab: tabSelect.value,
-        type: typeSelect.value,
-        bdPlayerTags: [...bdPlayerTags.entries()],
-        bdSortCol,
-        bdSortDir,
-      };
+      const cfg = serializeConfig({
+        playerTags, recentPlayers, boxType: currentBoxType,
+        team: teamSelect.value, tab: tabSelect.value, type: typeSelect.value,
+        bdPlayerTags, bdSortCol, bdSortDir,
+      });
       localStorage.setItem(LS_KEY, JSON.stringify(cfg));
       saveDefaultBtn.classList.add('has-default');
       saveDefaultBtn.title = 'Default saved — click to update';
