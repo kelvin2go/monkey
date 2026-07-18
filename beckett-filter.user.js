@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Beckett Card Filter
 // @namespace    https://github.com/kelvin2go/card-script
-// @version      4.2.3
+// @version      4.2.4
 // @description  Collapsible sidebar — filter by box, player, team, tab, and card type
 // @author       kelvin2go
 // @match        https://www.beckett.com/news/*
@@ -862,7 +862,18 @@
     const bdTableWrap = sidebar.querySelector('#bk-bd-table-wrap');
     const bdTagsEl = sidebar.querySelector('#bk-bd-player-tags');
     const bdAcEl = sidebar.querySelector('#bk-bd-autocomplete');
-    let bdPlayerTags = [];
+    // bdPlayerTags: Map<name, colorIndex>
+    let bdPlayerTags = new Map();
+    const BD_TAG_PALETTE = [
+      { bg: '#2d1a0e', border: '#c85a1a', text: '#ff8c6e' }, // orange
+      { bg: '#0d1f35', border: '#1e5fa0', text: '#5aadff' }, // blue
+      { bg: '#1a2d0e', border: '#4a9a1a', text: '#7ddd50' }, // green
+      { bg: '#2d2200', border: '#a07000', text: '#ffc130' }, // gold
+      { bg: '#1f0d2a', border: '#7a30b0', text: '#c97dff' }, // purple
+      { bg: '#2a0d0d', border: '#b02020', text: '#ff6b6b' }, // red
+      { bg: '#0d2a2a', border: '#1a8080', text: '#4dcccc' }, // teal
+      { bg: '#2a1a00', border: '#907000', text: '#e0a030' }, // amber
+    ];
     const snapBtn = sidebar.querySelector('#bk-snap-btn');
     const compareBtn = sidebar.querySelector('#bk-compare-btn');
     const snapLabelEl = sidebar.querySelector('#bk-snap-label');
@@ -963,9 +974,9 @@
       bdTableWrap.innerHTML = '';
       const lq = bdQuery.toLowerCase();
       let players = Object.keys(playerMap).sort();
-      if (bdPlayerTags.length > 0) {
-        const tagSet = new Set(bdPlayerTags);
-        const pinned = bdPlayerTags.filter(p => playerMap[p] || (compareSnap && (compareSnap.playerMap[p])));
+      if (bdPlayerTags.size > 0) {
+        const tagSet = bdPlayerTags;
+        const pinned = [...bdPlayerTags.keys()].filter(p => playerMap[p] || (compareSnap && compareSnap.playerMap[p]));
         const rest = players.filter(p => !tagSet.has(p) && (!lq || p.toLowerCase().includes(lq)));
         players = [...pinned, ...rest];
       } else if (lq) {
@@ -998,10 +1009,10 @@
       }
 
       const tbody = table.createTBody();
-      const tagSet = new Set(bdPlayerTags);
+      const tagSet = bdPlayerTags;
       let passedPinned = false;
       players.forEach((player) => {
-        if (bdPlayerTags.length > 0 && !tagSet.has(player) && !passedPinned) {
+        if (bdPlayerTags.size > 0 && !tagSet.has(player) && !passedPinned) {
           passedPinned = true;
           const sep = tbody.insertRow();
           sep.style.cssText = 'height:1px;background:#3a3a3c;pointer-events:none';
@@ -1010,10 +1021,11 @@
           td.style.cssText = 'padding:0;background:#3a3a3c';
         }
         const row = tbody.insertRow();
-        if (tagSet.has(player)) row.style.background = '#1e1e20';
+        const playerTagColor = tagSet.has(player) ? BD_TAG_PALETTE[tagSet.get(player) % BD_TAG_PALETTE.length] : null;
+        if (playerTagColor) row.style.background = playerTagColor.bg + '88';
         const tdName = row.insertCell();
         tdName.textContent = player;
-        if (tagSet.has(player)) tdName.style.color = '#ff8c6e';
+        if (playerTagColor) tdName.style.color = playerTagColor.text;
         tdName.style.cursor = 'pointer';
         tdName.title = 'Show in Results';
         tdName.addEventListener('click', () => goToResultsWithPlayer(player));
@@ -1105,16 +1117,37 @@
       renderBreakdownTable(tabCols, playerMap, bdSearchEl.value.trim(), null);
     }
 
+    function bdTagColor(name) {
+      return BD_TAG_PALETTE[bdPlayerTags.get(name) % BD_TAG_PALETTE.length];
+    }
+
+    function applyTagStyle(el, c) {
+      el.style.background = c.bg;
+      el.style.border = `1px solid ${c.border}`;
+      el.style.color = c.text;
+    }
+
     function renderBdTags() {
       bdTagsEl.innerHTML = '';
-      bdPlayerTags.forEach((name) => {
+      bdPlayerTags.forEach((colorIdx, name) => {
+        const c = BD_TAG_PALETTE[colorIdx % BD_TAG_PALETTE.length];
         const chip = document.createElement('span');
         chip.className = 'bk-player-tag';
-        chip.textContent = name;
+        chip.title = 'Click to change color';
+        chip.style.cursor = 'pointer';
+        applyTagStyle(chip, c);
+        chip.appendChild(document.createTextNode(name));
+        chip.addEventListener('click', (e) => {
+          if (e.target.tagName === 'BUTTON') return;
+          bdPlayerTags.set(name, (colorIdx + 1) % BD_TAG_PALETTE.length);
+          renderBdTags();
+          renderBreakdown();
+        });
         const x = document.createElement('button');
         x.textContent = '×';
         x.title = 'Remove';
-        x.onclick = () => { bdPlayerTags = bdPlayerTags.filter(p => p !== name); renderBdTags(); renderBreakdown(); };
+        x.style.color = c.border;
+        x.onclick = () => { bdPlayerTags.delete(name); renderBdTags(); renderBreakdown(); };
         chip.appendChild(x);
         bdTagsEl.appendChild(chip);
       });
@@ -1127,7 +1160,7 @@
       const pool = compareMode && snapshots.length >= 2
         ? [...new Set([...Object.keys(snapshots[parseInt(cmpA.value) || 0].playerMap), ...Object.keys(snapshots[parseInt(cmpB.value) || 1].playerMap)])]
         : allPlayers;
-      const matches = pool.filter(p => p.toLowerCase().includes(lq) && !bdPlayerTags.includes(p)).slice(0, 12);
+      const matches = pool.filter(p => p.toLowerCase().includes(lq) && !bdPlayerTags.has(p)).slice(0, 12);
       matches.forEach((name) => {
         const item = document.createElement('div');
         item.className = 'bk-ac-item';
@@ -1135,7 +1168,7 @@
         item.innerHTML = name.slice(0, idx) + '<em>' + name.slice(idx, idx + q.length) + '</em>' + name.slice(idx + q.length);
         item.onmousedown = (e) => {
           e.preventDefault();
-          bdPlayerTags.push(name);
+          bdPlayerTags.set(name, bdPlayerTags.size % BD_TAG_PALETTE.length);
           bdSearchEl.value = '';
           bdAcEl.innerHTML = '';
           renderBdTags();
