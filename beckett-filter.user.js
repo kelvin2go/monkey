@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Beckett Card Filter
 // @namespace    https://github.com/kelvin2go/card-script
-// @version      4.3.0
+// @version      4.3.1
 // @description  Collapsible sidebar — filter by box, player, team, tab, and card type
 // @author       kelvin2go
 // @license      MIT
@@ -36,7 +36,8 @@
   const RC_RE = /\s*\bRC\b\s*/g;
   const ODDS_RE = /(\w+)\s*[–\-]\s*1:([0-9,]+)/g;
   const ID_CARD_RE = /([A-Z]+-[A-Z0-9]+)\s+(.+?)(?=\s*[A-Z]+-[A-Z0-9]+\s|$)/g;
-  const NUM_CARD_RE = /(\d+)\s+([A-Z][^,\d]+?)(?=\d+\s+[A-Z]|$)/g;
+  const NUM_CARD_RE = /(\d+)\s+([A-Z].+?)(?=\s*\d+\s+[A-Z]|\s*$)/g;
+  const SERIAL_JAM_RE = /\/(\d+?)(\d)(?=\s+[A-Z])/g; // '/99' jammed against next card number
 
   function findAllTabBodies() {
     const results = [];
@@ -108,10 +109,18 @@
   function parseNumberedCards(rawText) {
     const cards = [];
     for (const line of rawText.split(/\n/)) {
+      // Split serial numbers jammed against next card number: '/992 Tre' → ' 2 Tre'
+      const cleaned = line.trim().replace(SERIAL_JAM_RE, ' $2');
       NUM_CARD_RE.lastIndex = 0;
       let m;
-      while ((m = NUM_CARD_RE.exec(line.trim())) !== null) {
-        cards.push({ id: m[1], player: m[2].replace(RC_RE, '').trim(), team: '' });
+      while ((m = NUM_CARD_RE.exec(cleaned)) !== null) {
+        const full = m[2].replace(RC_RE, '').replace(/\s*\/\d+\s*$/, '').trim();
+        const lastComma = full.lastIndexOf(', ');
+        cards.push({
+          id: m[1],
+          player: lastComma > 0 ? full.slice(0, lastComma) : full,
+          team:   lastComma > 0 ? full.slice(lastComma + 2) : '',
+        });
       }
     }
     return cards;

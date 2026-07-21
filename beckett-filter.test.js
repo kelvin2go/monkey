@@ -5,7 +5,8 @@
 const RC_RE = /\s*\bRC\b\s*/g;
 const ODDS_RE = /(\w+)\s*[–\-]\s*1:([0-9,]+)/g;
 const ID_CARD_RE = /([A-Z]+-[A-Z0-9]+)\s+(.+?)(?=\s*[A-Z]+-[A-Z0-9]+\s|$)/g;
-const NUM_CARD_RE = /(\d+)\s+([A-Z][^,\d]+?)(?=\d+\s+[A-Z]|$)/g;
+const NUM_CARD_RE = /(\d+)\s+([A-Z].+?)(?=\s*\d+\s+[A-Z]|\s*$)/g;
+const SERIAL_JAM_RE = /\/(\d+?)(\d)(?=\s+[A-Z])/g;
 
 function parseOdds(rawText) {
   const odds = {};
@@ -40,10 +41,17 @@ function parseIdCards(rawText) {
 function parseNumberedCards(rawText) {
   const cards = [];
   for (const line of rawText.split(/\n/)) {
+    const cleaned = line.trim().replace(SERIAL_JAM_RE, ' $2');
     NUM_CARD_RE.lastIndex = 0;
     let m;
-    while ((m = NUM_CARD_RE.exec(line.trim())) !== null) {
-      cards.push({ id: m[1], player: m[2].replace(RC_RE, '').trim(), team: '' });
+    while ((m = NUM_CARD_RE.exec(cleaned)) !== null) {
+      const full = m[2].replace(RC_RE, '').replace(/\s*\/\d+\s*$/, '').trim();
+      const lastComma = full.lastIndexOf(', ');
+      cards.push({
+        id: m[1],
+        player: lastComma > 0 ? full.slice(0, lastComma) : full,
+        team:   lastComma > 0 ? full.slice(lastComma + 2) : '',
+      });
     }
   }
   return cards;
@@ -137,7 +145,7 @@ assert('mixed-length suffix (ATH)',
 
 // ── parseNumberedCards ────────────────────────────────────────────────────────
 console.log('\nparseNumberedCards');
-assert('two consecutive',
+assert('two consecutive no team',
   parseNumberedCards('1 Anthony Edwards2 Ja Morant'),
   [
     { id: '1', player: 'Anthony Edwards', team: '' },
@@ -147,6 +155,25 @@ assert('two consecutive',
 assert('RC stripped',
   parseNumberedCards('5 Victor Wembanyama RC'),
   [{ id: '5', player: 'Victor Wembanyama', team: '' }]);
+
+assert('with team (no serial)',
+  parseNumberedCards('45 Norchad Omier, Cleveland Cavaliers46 Zeke Mayo, Washington Wizards'),
+  [
+    { id: '45', player: 'Norchad Omier', team: 'Cleveland Cavaliers' },
+    { id: '46', player: 'Zeke Mayo', team: 'Washington Wizards' },
+  ]);
+
+assert('serial number jammed against next card number',
+  parseNumberedCards('1 VJ Edgecombe, Philadelphia 76ers /992 Tre Johnson III, Washington Wizards /993 Jeremiah Fears, New Orleans Pelicans /99'),
+  [
+    { id: '1', player: 'VJ Edgecombe', team: 'Philadelphia 76ers' },
+    { id: '2', player: 'Tre Johnson III', team: 'Washington Wizards' },
+    { id: '3', player: 'Jeremiah Fears', team: 'New Orleans Pelicans' },
+  ]);
+
+assert('trailing serial on last entry stripped',
+  parseNumberedCards('1 Ace Bailey, Utah Jazz /99'),
+  [{ id: '1', player: 'Ace Bailey', team: 'Utah Jazz' }]);
 
 // ── parseCards fallback logic ─────────────────────────────────────────────────
 console.log('\nparseCards fallback');
