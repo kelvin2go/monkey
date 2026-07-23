@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Beckett Card Filter
 // @namespace    https://github.com/kelvin2go/card-script
-// @version      4.3.2
+// @version      4.3.4
 // @description  Collapsible sidebar — filter by box, player, team, tab, and card type
 // @author       kelvin2go
 // @license      MIT
@@ -1515,6 +1515,42 @@
     }
 
     populateDropdowns();
+
+    // ── Hash-based auto-filter ──
+    // e.g. #trailblazers → match team "Portland Trail Blazers"
+    //      #autographs   → match tab
+    function applyHashFilter() {
+      const hash = location.hash.replace('#', '').toLowerCase().replace(/[-_]/g, '');
+      if (!hash) return;
+
+      // Try tab first
+      const tabOpt = Array.from(tabSelect.options).find(o => {
+        const slug = o.value.toLowerCase().replace(/\s+/g, '');
+        return slug === hash || slug.startsWith(hash) || hash.startsWith(slug);
+      });
+      if (tabOpt && tabOpt.value) {
+        tabSelect.value = tabOpt.value;
+        const base = getBaseSections();
+        rebuildTypeOptions(base.filter(s => s.tabName === tabOpt.value));
+        typeSelect.value = '';
+        render();
+        return;
+      }
+
+      // Try team
+      const teamOpt = Array.from(teamSelect.options).find(o => {
+        const slug = o.value.toLowerCase().replace(/\s+/g, '').replace(/[^a-z]/g, '');
+        return slug === hash || slug.includes(hash) || hash.includes(slug.slice(0, Math.max(4, slug.length - 2)));
+      });
+      if (teamOpt && teamOpt.value) {
+        teamSelect.value = teamOpt.value;
+        render();
+      }
+    }
+
+    applyHashFilter();
+    window.addEventListener('hashchange', applyHashFilter);
+
     render();
   }
 
@@ -1548,12 +1584,16 @@
     init();
   }
 
+  // Also try on full window load (images/scripts done) — catches pages where tab
+  // content is injected after DOMContentLoaded (e.g. Gutenberg block hydration)
+  window.addEventListener('load', init);
+
   let retries = 0, observerTimer;
   const observer = new MutationObserver(() => {
     if (document.getElementById('bk-toggle')) { observer.disconnect(); return; }
-    if (++retries > 20) { observer.disconnect(); return; }
+    if (++retries > 40) { observer.disconnect(); return; }
     clearTimeout(observerTimer);
     observerTimer = setTimeout(init, 300);
   });
-  observer.observe(document.body, { childList: true });
+  observer.observe(document.body, { childList: true, subtree: true });
 })();
