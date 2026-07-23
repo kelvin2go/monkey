@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Beckett Card Filter
 // @namespace    https://github.com/kelvin2go/card-script
-// @version      4.3.5
+// @version      4.3.6
 // @description  Collapsible sidebar — filter by box, player, team, tab, and card type
 // @author       kelvin2go
 // @license      MIT
@@ -1523,12 +1523,13 @@
       const hash = location.hash.replace('#', '').toLowerCase().replace(/[-_]/g, '');
       if (!hash) return;
 
-      // Try tab first
+      // Try tab first (skip blank option)
       const tabOpt = Array.from(tabSelect.options).find(o => {
+        if (!o.value) return false;
         const slug = o.value.toLowerCase().replace(/\s+/g, '');
         return slug === hash || slug.startsWith(hash) || hash.startsWith(slug);
       });
-      if (tabOpt && tabOpt.value) {
+      if (tabOpt) {
         tabSelect.value = tabOpt.value;
         const base = getBaseSections();
         rebuildTypeOptions(base.filter(s => s.tabName === tabOpt.value));
@@ -1537,12 +1538,12 @@
         return;
       }
 
-      // Try team
-      const teamOpt = Array.from(teamSelect.options).find(o => {
-        const slug = o.value.toLowerCase().replace(/\s+/g, '').replace(/[^a-z]/g, '');
-        return slug === hash || slug.includes(hash) || hash.includes(slug.slice(0, Math.max(4, slug.length - 2)));
-      });
-      if (teamOpt && teamOpt.value) {
+      // Try team — prefer exact slug match, then substring
+      const toSlug = v => v.toLowerCase().replace(/\s+/g, '').replace(/[^a-z]/g, '');
+      const teamOpt =
+        Array.from(teamSelect.options).find(o => o.value && toSlug(o.value) === hash) ||
+        Array.from(teamSelect.options).find(o => o.value && toSlug(o.value).includes(hash));
+      if (teamOpt) {
         teamSelect.value = teamOpt.value;
         render();
       }
