@@ -197,6 +197,36 @@ assert('numbered fallback does not run when ID parser succeeds',
   parseCards('AB-1 Edwards, WolvesAB-2 Morant, Grizzlies').length,
   2);
 
+// ── combo team splitting ──────────────────────────────────────────────────────
+console.log('\ncombo team splitting');
+
+function expandTeams(cards) {
+  return [...new Set(cards.flatMap(c => c.team ? c.team.split('/').map(t => t.trim()) : []))].filter(Boolean).sort();
+}
+
+function teamMatches(card, teamFilter) {
+  return card.team.split('/').map(t => t.trim()).includes(teamFilter);
+}
+
+assert('combo team expands to both',
+  expandTeams([
+    { team: 'Los Angeles Clippers/Phoenix Suns' },
+    { team: 'Boston Celtics' },
+  ]),
+  ['Boston Celtics', 'Los Angeles Clippers', 'Phoenix Suns']);
+
+assert('filter matches first part',
+  teamMatches({ team: 'Los Angeles Clippers/Phoenix Suns' }, 'Los Angeles Clippers'),
+  true);
+
+assert('filter matches second part',
+  teamMatches({ team: 'Los Angeles Clippers/Phoenix Suns' }, 'Phoenix Suns'),
+  true);
+
+assert('filter rejects non-matching team',
+  teamMatches({ team: 'Los Angeles Clippers/Phoenix Suns' }, 'Boston Celtics'),
+  false);
+
 // ── hitRate ───────────────────────────────────────────────────────────────────
 console.log('\nhitRate');
 assert('zero odds → null', hitRate(0, 24), null);
