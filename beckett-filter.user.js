@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Beckett Card Filter
 // @namespace    https://github.com/kelvin2go/card-script
-// @version      4.3.7
+// @version      4.3.8
 // @description  Collapsible sidebar — filter by box, player, team, tab, and card type
 // @author       kelvin2go
 // @license      MIT
@@ -1538,13 +1538,13 @@
         return;
       }
 
-      // Try team — prefer exact slug, then ends-with (avoids combo teams), then substring
+      // Try team — prefer exact slug match, then shortest slug containing hash (avoids combo teams)
       const toSlug = v => v.toLowerCase().replace(/\s+/g, '').replace(/[^a-z]/g, '');
       const teamOpts = Array.from(teamSelect.options).filter(o => o.value);
-      const teamOpt =
-        teamOpts.find(o => toSlug(o.value) === hash) ||
-        teamOpts.find(o => toSlug(o.value).endsWith(hash)) ||
-        teamOpts.find(o => toSlug(o.value).includes(hash));
+      const exactMatch = teamOpts.find(o => toSlug(o.value) === hash);
+      const subMatches = teamOpts.filter(o => toSlug(o.value).includes(hash));
+      subMatches.sort((a, b) => toSlug(a.value).length - toSlug(b.value).length);
+      const teamOpt = exactMatch || subMatches[0];
       if (teamOpt) {
         teamSelect.value = teamOpt.value;
         render();
