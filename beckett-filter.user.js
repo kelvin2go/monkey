@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Beckett Card Filter
 // @namespace    https://github.com/kelvin2go/card-script
-// @version      4.3.4
+// @version      4.3.5
 // @description  Collapsible sidebar — filter by box, player, team, tab, and card type
 // @author       kelvin2go
 // @license      MIT
@@ -937,7 +937,7 @@
         if (!cfg) return;
         playerTags    = cfg.playerTags;
         recentPlayers = cfg.recentPlayers;
-        if (cfg.boxType) {
+        if (cfg.boxType && boxTypes.includes(cfg.boxType)) {
           currentBoxType = cfg.boxType;
           boxRow.querySelectorAll('.bk-box-btn').forEach((b) => {
             b.classList.toggle('active', b.textContent.trim() === cfg.boxType);
