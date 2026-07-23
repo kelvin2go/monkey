@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Beckett Card Filter
 // @namespace    https://github.com/kelvin2go/card-script
-// @version      4.3.8
+// @version      4.3.9
 // @description  Collapsible sidebar — filter by box, player, team, tab, and card type
 // @author       kelvin2go
 // @license      MIT
@@ -95,7 +95,7 @@
       ID_CARD_RE.lastIndex = 0;
       let m;
       while ((m = ID_CARD_RE.exec(line.trim())) !== null) {
-        const full = m[2].replace(RC_RE, '').trim();
+        const full = m[2].replace(RC_RE, '').replace(/\s*\/\d+\s*$/, '').trim();
         const lastComma = full.lastIndexOf(', ');
         cards.push({
           id: m[1],

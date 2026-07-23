@@ -26,7 +26,7 @@ function parseIdCards(rawText) {
     ID_CARD_RE.lastIndex = 0;
     let m;
     while ((m = ID_CARD_RE.exec(line.trim())) !== null) {
-      const full = m[2].replace(RC_RE, '').trim();
+      const full = m[2].replace(RC_RE, '').replace(/\s*\/\d+\s*$/, '').trim();
       const lastComma = full.lastIndexOf(', ');
       cards.push({
         id: m[1],
@@ -142,6 +142,13 @@ assert('letter-suffix concatenated',
 assert('mixed-length suffix (ATH)',
   parseIdCards('RCA-ATH Adou Thiero, Los Angeles Lakers'),
   [{ id: 'RCA-ATH', player: 'Adou Thiero', team: 'Los Angeles Lakers' }]);
+
+assert('trailing serial stripped from team',
+  parseIdCards('FM-AB Ace Bailey, Utah Jazz /10FM-AT Adou Thiero, Los Angeles Lakers /10'),
+  [
+    { id: 'FM-AB', player: 'Ace Bailey', team: 'Utah Jazz' },
+    { id: 'FM-AT', player: 'Adou Thiero', team: 'Los Angeles Lakers' },
+  ]);
 
 // ── parseNumberedCards ────────────────────────────────────────────────────────
 console.log('\nparseNumberedCards');
