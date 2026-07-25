@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Beckett Card Filter
 // @namespace    https://github.com/kelvin2go/card-script
-// @version      4.4.2
+// @version      4.4.3
 // @description  Collapsible sidebar — filter by box, player, team, tab, and card type
 // @author       kelvin2go
 // @license      MIT
@@ -1099,6 +1099,7 @@
       const [typeTab, typeTitle] = typeFilter ? typeFilter.split('::') : [];
       const base = getBaseSections();
       return base
+        .filter((s) => !SKIP_TYPE.test(s.title) && !SKIP_TYPE.test(s.tabName))
         .filter((s) => !tabFilter || s.tabName === tabFilter)
         .filter((s) => !typeFilter || (s.tabName === typeTab && s.title === typeTitle))
         .map((s) => ({
@@ -1426,6 +1427,7 @@
       const base = getBaseSections();
 
       const filtered = base
+        .filter((s) => !SKIP_TYPE.test(s.title) && !SKIP_TYPE.test(s.tabName))
         .filter((s) => !tabFilter || s.tabName === tabFilter)
         .filter((s) => !typeFilter || (s.tabName === typeTab && s.title === typeTitle))
         .map((s) => {
