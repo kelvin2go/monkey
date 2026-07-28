@@ -809,7 +809,7 @@
     let playerTags = [];
     let recentPlayers = []; // last 5 used, greyed when not active
 
-    const allPlayers = [...new Set(sections.flatMap(s => s.cards.map(c => c.player)).filter(Boolean))].sort();
+    const allPlayers = [...new Set(sections.filter(s => !SKIP_TYPE.test(s.title) && !SKIP_TYPE.test(s.tabName)).flatMap(s => s.cards.map(c => c.player)).filter(Boolean))].sort();
 
     function trackRecent(name) {
       recentPlayers = [name, ...recentPlayers.filter(p => p !== name)].slice(0, 5);
