@@ -1,13 +1,13 @@
 // ==UserScript==
 // @name         Beckett Card Filter
-// @namespace    https://github.com/kelvin2go/card-script
-// @version      4.4.4
+// @namespace    https://github.com/kelvin2go/monkey
+// @version      4.4.5
 // @description  Collapsible sidebar — filter by box, player, team, tab, and card type
 // @author       kelvin2go
 // @license      MIT
 // @match        https://www.beckett.com/news/*
-// @updateURL    https://raw.githubusercontent.com/kelvin2go/card-script/main/beckett-filter.user.js
-// @downloadURL  https://raw.githubusercontent.com/kelvin2go/card-script/main/beckett-filter.user.js
+// @updateURL    https://raw.githubusercontent.com/kelvin2go/monkey/main/beckett-filter.user.js
+// @downloadURL  https://raw.githubusercontent.com/kelvin2go/monkey/main/beckett-filter.user.js
 // @grant        GM_addStyle
 // @run-at       document-idle
 // ==/UserScript==
