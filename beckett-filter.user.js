@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Beckett Card Filter
 // @namespace    https://github.com/kelvin2go/monkey
-// @version      4.4.6
+// @version      4.4.7
 // @description  Collapsible sidebar — filter by box, player, team, tab, and card type
 // @author       kelvin2go
 // @license      MIT
@@ -1085,14 +1085,16 @@
     function buildBreakdownData(sourceSections) {
       const tabCols = [...new Set(sourceSections.map(s => s.tabName))];
       const playerMap = {};
+      const playerTeams = {};
       sourceSections.forEach((s) => {
         s.cards.forEach((c) => {
           if (!c.player) return;
           if (!playerMap[c.player]) playerMap[c.player] = {};
           playerMap[c.player][s.tabName] = (playerMap[c.player][s.tabName] || 0) + 1;
+          if (c.team && !playerTeams[c.player]) playerTeams[c.player] = c.team;
         });
       });
-      return { tabCols, playerMap };
+      return { tabCols, playerMap, playerTeams };
     }
 
     function getCurrentBreakdownSections() {
@@ -1118,7 +1120,7 @@
         .filter((s) => s.cards.length > 0);
     }
 
-    function renderBreakdownTable(tabCols, playerMap, bdQuery, compareSnap) {
+    function renderBreakdownTable(tabCols, playerMap, playerTeams, bdQuery, compareSnap) {
       bdTableWrap.innerHTML = '';
       const lq = bdQuery.toLowerCase();
       let players = Object.keys(playerMap).sort();
@@ -1201,8 +1203,13 @@
         const playerTagColor = tagSet.has(player) ? BD_TAG_PALETTE[tagSet.get(player) % BD_TAG_PALETTE.length] : null;
         if (playerTagColor) row.style.background = playerTagColor.bg + '88';
         const tdName = row.insertCell();
-        tdName.textContent = player;
-        if (playerTagColor) tdName.style.color = playerTagColor.text;
+        const team = playerTeams[player] || '';
+        if (team) {
+          tdName.innerHTML = `<span>${player}</span> <span style="color:#636366;font-size:10px;font-weight:400">${team}</span>`;
+        } else {
+          tdName.textContent = player;
+        }
+        if (playerTagColor) tdName.querySelector('span').style.color = playerTagColor.text;
         tdName.style.cursor = 'pointer';
         tdName.title = 'Show in Results';
         tdName.addEventListener('click', () => goToResultsWithPlayer(player));
@@ -1285,13 +1292,14 @@
         const allPlayerNames = [...new Set([...Object.keys(snapA.playerMap), ...Object.keys(snapB.playerMap)])];
         const mergedMap = {};
         allPlayerNames.forEach(p => { mergedMap[p] = snapB.playerMap[p] || {}; });
-        renderBreakdownTable(tabCols, mergedMap, bdSearchEl.value.trim(), snapA);
+        const mergedTeams = { ...snapA.playerTeams, ...snapB.playerTeams };
+        renderBreakdownTable(tabCols, mergedMap, mergedTeams, bdSearchEl.value.trim(), snapA);
         return;
       }
 
       const activeSections = getCurrentBreakdownSections();
-      const { tabCols, playerMap } = buildBreakdownData(activeSections);
-      renderBreakdownTable(tabCols, playerMap, bdSearchEl.value.trim(), null);
+      const { tabCols, playerMap, playerTeams } = buildBreakdownData(activeSections);
+      renderBreakdownTable(tabCols, playerMap, playerTeams, bdSearchEl.value.trim(), null);
     }
 
     function bdTagColor(name) {
@@ -1371,9 +1379,9 @@
 
     snapBtn.addEventListener('click', () => {
       const activeSections = getCurrentBreakdownSections();
-      const { tabCols, playerMap } = buildBreakdownData(activeSections);
+      const { tabCols, playerMap, playerTeams } = buildBreakdownData(activeSections);
       const label = getActiveLabel() || `Snapshot ${snapshots.length + 1}`;
-      snapshots.push({ label, tabCols, playerMap });
+      snapshots.push({ label, tabCols, playerMap, playerTeams });
       updateSnapUI();
       // Auto-enter compare mode on 2nd snapshot
       if (snapshots.length === 2 && !compareMode) {
