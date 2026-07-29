@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Beckett Card Filter
 // @namespace    https://github.com/kelvin2go/monkey
-// @version      4.5.2
+// @version      4.5.3
 // @description  Collapsible sidebar — filter by box, player, team, tab, and card type
 // @author       kelvin2go
 // @license      MIT
@@ -187,20 +187,25 @@
     'LeBron James': 5, 'Stephen Curry': 5, 'Kevin Durant': 5,
     'Giannis Antetokounmpo': 5, 'Luka Doncic': 5, 'Victor Wembanyama': 5,
     'Nikola Jokic': 5,
-    // Tier 2 — all-stars / top rookies (×3)
+    // Tier 2 — all-stars / franchise cornerstones (×3)
     'Jayson Tatum': 3, 'Devin Booker': 3, 'Anthony Edwards': 3,
     'Ja Morant': 3, 'Zion Williamson': 3, 'Joel Embiid': 3,
     'Kawhi Leonard': 3, 'Paul George': 3, 'Damian Lillard': 3,
     'Karl-Anthony Towns': 3, 'Bam Adebayo': 3, 'Donovan Mitchell': 3,
-    'Cooper Flagg': 3, 'Ace Bailey': 3, 'Dylan Harper': 3,
-    'Kon Knueppel': 3, 'Derik Queen': 3, 'Jeremiah Fears': 3,
+    'LaMelo Ball': 3, 'Shai Gilgeous-Alexander': 3, 'Trae Young': 3,
+    // 2025-26 top rookies
+    'Cooper Flagg': 4, 'Dylan Harper': 3.5, 'Ace Bailey': 2.8,
+    'Kon Knueppel': 2.8, 'Derik Queen': 2.8, 'Jeremiah Fears': 2.8,
     // Tier 3 — solid demand (×1.8)
-    'Jimmy Butler': 1.8, 'Trae Young': 1.8, 'Kyrie Irving': 1.8,
+    'Jimmy Butler': 1.8, 'Kyrie Irving': 1.8,
     'Draymond Green': 1.8, 'Chris Paul': 1.8, 'Russell Westbrook': 1.8,
-    'De\'Aaron Fox': 1.8, 'Tyrese Haliburton': 1.8, 'Paolo Banchero': 1.8,
+    "De'Aaron Fox": 1.8, 'Tyrese Haliburton': 1.8, 'Paolo Banchero': 1.8,
     'Cade Cunningham': 1.8, 'Evan Mobley': 1.8, 'Franz Wagner': 1.8,
     'Scottie Barnes': 1.8, 'Jabari Smith': 1.8, 'Bennedict Mathurin': 1.8,
     'Stephon Castle': 1.8, "Kel'el Ware": 1.8, 'Zaccharie Risacher': 1.8,
+    'Lauri Markkanen': 1.8, 'Brandon Miller': 1.8, 'Keyonte George': 1.8,
+    'Darius Garland': 1.8, 'Jalen Green': 1.8, 'Josh Giddey': 1.8,
+    'Alperen Sengun': 1.8, 'Ausar Thompson': 1.8, 'Amen Thompson': 1.8,
   };
 
   function playerMultiplier(playerName, isRc) {
@@ -236,6 +241,14 @@
         });
       });
     });
+
+    // Debug: log top-10 teams and all card contributions to console
+    const sortedForLog = Object.keys(scores).sort((a, b) => scores[b] - scores[a]).slice(0, 10);
+    console.group('[BF] Team tier scores (top 10)');
+    sortedForLog.forEach(t => console.log(`  ${t}: ${scores[t].toFixed(2)}`));
+    console.groupEnd();
+    window.__bfScores = scores;
+    window.__bfDetail = detail;
 
     // Score-relative tiers: thresholds are fractions of the top team's score.
     // This mirrors cardhitlist's approach — a weak product won't force S/A labels
