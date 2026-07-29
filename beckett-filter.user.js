@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Beckett Card Filter
 // @namespace    https://github.com/kelvin2go/monkey
-// @version      4.5.0
+// @version      4.5.1
 // @description  Collapsible sidebar — filter by box, player, team, tab, and card type
 // @author       kelvin2go
 // @license      MIT
@@ -203,27 +203,47 @@
       });
     });
 
-    // percentile-based tiers across however many teams exist
+    // Score-relative tiers: thresholds are fractions of the top team's score.
+    // This mirrors cardhitlist's approach — a weak product won't force S/A labels
+    // on teams that barely have any hits.
     const teams = Object.keys(scores).sort((a, b) => scores[b] - scores[a]);
-    const n = teams.length;
+    const maxScore = scores[teams[0]] || 1;
     const TIER_BANDS = [
-      { label: 'S', color: '#e63c14', bg: '#2d0e06', pct: 0.10 },
-      { label: 'A', color: '#ffc130', bg: '#2d2200', pct: 0.25 },
-      { label: 'B', color: '#5ac85a', bg: '#1a2d1a', pct: 0.50 },
-      { label: 'C', color: '#5aadff', bg: '#0d1f2d', pct: 0.75 },
-      { label: 'D', color: '#8e8e93', bg: '#1c1c1e', pct: 1.00 },
+      { label: 'S', color: '#ff4d1a', bg: '#2d0e06', min: 0.75 },
+      { label: 'A', color: '#ffc130', bg: '#2d2200', min: 0.50 },
+      { label: 'B', color: '#5ac85a', bg: '#162416', min: 0.30 },
+      { label: 'C', color: '#5aadff', bg: '#0d1f2d', min: 0.15 },
+      { label: 'D', color: '#636366', bg: '#1c1c1e', min: 0 },
     ];
 
     const tiered = [];
-    let prevCutoff = 0;
-    TIER_BANDS.forEach(({ label, color, bg, pct }) => {
-      const cutoff = Math.round(n * pct);
-      const slice = teams.slice(prevCutoff, cutoff);
+    TIER_BANDS.forEach(({ label, color, bg, min }) => {
+      const slice = teams.filter(t => (scores[t] / maxScore) >= min &&
+        !tiered.some(b => b.teams.includes(t)));
       if (slice.length) tiered.push({ label, color, bg, teams: slice });
-      prevCutoff = cutoff;
     });
 
     return { tiered, scores, detail };
+  }
+
+  // ─── NBA team logo map (ESPN CDN) ────────────────────────────────────────────
+  const NBA_LOGO = {
+    'Atlanta Hawks': 'atl', 'Boston Celtics': 'bos', 'Brooklyn Nets': 'bkn',
+    'Charlotte Hornets': 'cha', 'Chicago Bulls': 'chi', 'Cleveland Cavaliers': 'cle',
+    'Dallas Mavericks': 'dal', 'Denver Nuggets': 'den', 'Detroit Pistons': 'det',
+    'Golden State Warriors': 'gsw', 'Houston Rockets': 'hou', 'Indiana Pacers': 'ind',
+    'LA Clippers': 'lac', 'Los Angeles Clippers': 'lac', 'Los Angeles Lakers': 'lal',
+    'Memphis Grizzlies': 'mem', 'Miami Heat': 'mia', 'Milwaukee Bucks': 'mil',
+    'Minnesota Timberwolves': 'min', 'New Orleans Pelicans': 'no', 'New York Knicks': 'ny',
+    'Oklahoma City Thunder': 'okc', 'Orlando Magic': 'orl', 'Philadelphia 76ers': 'phi',
+    'Phoenix Suns': 'phx', 'Portland Trail Blazers': 'por', 'Sacramento Kings': 'sac',
+    'San Antonio Spurs': 'sa', 'Toronto Raptors': 'tor', 'Utah Jazz': 'utah',
+    'Washington Wizards': 'wsh',
+  };
+
+  function teamLogoUrl(teamName) {
+    const abbrev = NBA_LOGO[teamName];
+    return abbrev ? `https://a.espncdn.com/i/teamlogos/nba/500/${abbrev}.png` : null;
   }
 
   // ─── Styles ───────────────────────────────────────────────────────────────────
@@ -652,44 +672,64 @@
       }
       #bk-bd-autocomplete:empty { display: none; }
       #bk-tiers-area {
-        flex: 1; overflow-y: auto; padding: 10px 14px 24px; display: none;
-        flex-direction: column; gap: 10px;
+        flex: 1; overflow-y: auto; padding: 8px 10px 24px; display: none;
+        flex-direction: column; gap: 0;
       }
       #bk-tiers-area.active { display: flex; }
       #bk-tiers-area::-webkit-scrollbar { width: 4px; }
       #bk-tiers-area::-webkit-scrollbar-thumb { background: #48484a; border-radius: 2px; }
-      .bk-tier-band { display: flex; align-items: flex-start; gap: 10px; }
+      .bk-tier-header {
+        display: flex; align-items: center; gap: 6px;
+        padding: 8px 4px 4px; margin-top: 4px;
+        border-bottom: 1px solid #2c2c2e;
+      }
+      .bk-tier-header:first-child { margin-top: 0; }
       .bk-tier-letter {
-        width: 28px; height: 28px; border-radius: 6px; display: flex;
+        width: 24px; height: 24px; border-radius: 5px; display: flex;
         align-items: center; justify-content: center;
-        font-size: 14px; font-weight: 800; flex-shrink: 0; margin-top: 2px;
+        font-size: 13px; font-weight: 900; flex-shrink: 0;
       }
-      .bk-tier-teams { display: flex; flex-wrap: wrap; gap: 5px; flex: 1; }
-      .bk-tier-chip {
-        display: inline-flex; align-items: center; gap: 5px;
-        border-radius: 8px; border: 1px solid; padding: 4px 8px;
-        font-size: 11px; font-weight: 600; cursor: pointer;
-        transition: opacity 0.15s;
+      .bk-tier-label-text { font-size: 10px; font-weight: 700; color: #636366; text-transform: uppercase; letter-spacing: 0.5px; }
+      .bk-tier-row {
+        display: flex; align-items: center; gap: 8px;
+        padding: 6px 4px; border-bottom: 1px solid #232325;
+        cursor: pointer; transition: background 0.1s; border-radius: 4px;
       }
-      .bk-tier-chip:hover { opacity: 0.8; }
-      .bk-tier-chip-counts {
-        font-size: 10px; font-weight: 400; opacity: 0.75;
+      .bk-tier-row:hover { background: #232325; }
+      .bk-tier-logo {
+        width: 28px; height: 28px; object-fit: contain; flex-shrink: 0;
       }
-      .bk-tier-expand {
-        margin-top: 6px; background: #232325; border-radius: 8px;
-        padding: 8px 10px; font-size: 11px; display: none; flex-direction: column; gap: 4px;
-        border: 1px solid #3a3a3c;
+      .bk-tier-logo-fallback {
+        width: 28px; height: 28px; border-radius: 50%; flex-shrink: 0;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 9px; font-weight: 800; color: #fff;
       }
-      .bk-tier-expand.open { display: flex; }
-      .bk-tier-expand-row { display: flex; justify-content: space-between; color: #aeaeb2; }
-      .bk-tier-expand-row span:last-child { font-weight: 600; color: #f2f2f7; }
+      .bk-tier-row-info { flex: 1; min-width: 0; }
+      .bk-tier-team-name {
+        font-size: 12px; font-weight: 600; color: #f2f2f7;
+        white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      }
+      .bk-tier-counts {
+        display: flex; gap: 6px; margin-top: 2px;
+      }
+      .bk-tier-count-pill {
+        font-size: 10px; font-weight: 700; border-radius: 3px;
+        padding: 1px 5px; letter-spacing: 0.2px;
+      }
+      .bk-tier-pill-auto { background: #2d2200; color: #ffc130; }
+      .bk-tier-pill-mem  { background: #1f0d2a; color: #c97dff; }
+      .bk-tier-pill-ins  { background: #0d1f35; color: #5aadff; }
+      .bk-tier-badge {
+        font-size: 10px; font-weight: 800; border-radius: 4px;
+        padding: 2px 6px; flex-shrink: 0;
+      }
       .bk-tier-filter-btn {
-        margin-top: 6px; background: #e63c14; border: none; border-radius: 6px;
-        color: #fff; font-size: 11px; font-weight: 700; padding: 5px 10px;
-        cursor: pointer; align-self: flex-start;
+        background: none; border: 1px solid #3a3a3c; border-radius: 6px;
+        color: #636366; font-size: 10px; padding: 3px 7px;
+        cursor: pointer; transition: all 0.15s; flex-shrink: 0;
       }
-      .bk-tier-filter-btn:hover { background: #c0320f; }
-      .bk-tier-note { font-size: 10px; color: #48484a; text-align: center; padding-top: 4px; }
+      .bk-tier-filter-btn:hover { border-color: #e63c14; color: #e63c14; }
+      .bk-tier-note { font-size: 10px; color: #48484a; text-align: center; padding-top: 8px; }
     `);
   }
 
@@ -1413,95 +1453,102 @@
       }
 
       tiered.forEach(({ label, color, bg, teams }) => {
-        const band = document.createElement('div');
-        band.className = 'bk-tier-band';
+        // tier header row
+        const header = document.createElement('div');
+        header.className = 'bk-tier-header';
+        const letterEl = document.createElement('div');
+        letterEl.className = 'bk-tier-letter';
+        letterEl.textContent = label;
+        letterEl.style.cssText = `background:${bg};color:${color};border:1px solid ${color}44`;
+        const labelText = document.createElement('span');
+        labelText.className = 'bk-tier-label-text';
+        labelText.textContent = { S: 'Must land', A: 'Great value', B: 'Solid', C: 'Below avg', D: 'Avoid' }[label] || label;
+        header.appendChild(letterEl);
+        header.appendChild(labelText);
+        tiersViewEl.appendChild(header);
 
-        const letter = document.createElement('div');
-        letter.className = 'bk-tier-letter';
-        letter.textContent = label;
-        letter.style.cssText = `background:${bg};color:${color};border:1px solid ${color}`;
-        band.appendChild(letter);
-
-        const teamsWrap = document.createElement('div');
-        teamsWrap.className = 'bk-tier-teams';
-
+        // one row per team
         teams.forEach((team) => {
           const d = detail[team] || { autos: 0, mem: 0, inserts: 0 };
-          const chipWrap = document.createElement('div');
-          chipWrap.style.cssText = 'display:flex;flex-direction:column;gap:0';
+          const row = document.createElement('div');
+          row.className = 'bk-tier-row';
 
-          const chip = document.createElement('div');
-          chip.className = 'bk-tier-chip';
-          chip.style.cssText = `background:${bg};color:${color};border-color:${color}`;
+          // logo or fallback
+          const logoUrl = teamLogoUrl(team);
+          if (logoUrl) {
+            const img = document.createElement('img');
+            img.className = 'bk-tier-logo';
+            img.src = logoUrl;
+            img.alt = team;
+            img.loading = 'lazy';
+            row.appendChild(img);
+          } else {
+            const fb = document.createElement('div');
+            fb.className = 'bk-tier-logo-fallback';
+            fb.style.background = color + '33';
+            fb.style.border = `1px solid ${color}55`;
+            fb.style.color = color;
+            fb.textContent = team.split(' ').map(w => w[0]).join('').slice(0, 3);
+            row.appendChild(fb);
+          }
 
-          const abbrev = team.replace(/^(.*)\s(\S+)$/, (_, rest, last) => {
-            const words = rest.split(' ');
-            return words.map(w => w[0]).join('') + last.slice(0, 3);
-          }).toUpperCase().slice(0, 6);
+          // name + count pills
+          const info = document.createElement('div');
+          info.className = 'bk-tier-row-info';
+          const nameEl = document.createElement('div');
+          nameEl.className = 'bk-tier-team-name';
+          nameEl.textContent = team;
+          info.appendChild(nameEl);
 
-          const nameSpan = document.createElement('span');
-          nameSpan.textContent = abbrev;
-          nameSpan.title = team;
+          const counts = document.createElement('div');
+          counts.className = 'bk-tier-counts';
+          if (d.autos) {
+            const p = document.createElement('span');
+            p.className = 'bk-tier-count-pill bk-tier-pill-auto';
+            p.textContent = `${d.autos} Auto`;
+            counts.appendChild(p);
+          }
+          if (d.mem) {
+            const p = document.createElement('span');
+            p.className = 'bk-tier-count-pill bk-tier-pill-mem';
+            p.textContent = `${d.mem} Mem`;
+            counts.appendChild(p);
+          }
+          if (d.inserts) {
+            const p = document.createElement('span');
+            p.className = 'bk-tier-count-pill bk-tier-pill-ins';
+            p.textContent = `${d.inserts} Ins`;
+            counts.appendChild(p);
+          }
+          info.appendChild(counts);
+          row.appendChild(info);
 
-          const countsSpan = document.createElement('span');
-          countsSpan.className = 'bk-tier-chip-counts';
-          const parts = [];
-          if (d.autos) parts.push(`${d.autos}A`);
-          if (d.mem) parts.push(`${d.mem}M`);
-          if (d.inserts) parts.push(`${d.inserts}I`);
-          countsSpan.textContent = parts.join('/');
+          // tier badge
+          const badge = document.createElement('span');
+          badge.className = 'bk-tier-badge';
+          badge.textContent = label;
+          badge.style.cssText = `background:${bg};color:${color};border:1px solid ${color}55`;
+          row.appendChild(badge);
 
-          chip.appendChild(nameSpan);
-          if (parts.length) chip.appendChild(countsSpan);
-
-          // expand panel
-          const expand = document.createElement('div');
-          expand.className = 'bk-tier-expand';
-
-          const rows = [
-            ['Team', team],
-            ['Autos', d.autos],
-            ['Memorabilia', d.mem],
-            ['Inserts', d.inserts],
-            ['Score', scores[team].toFixed(1)],
-          ];
-          rows.forEach(([k, v]) => {
-            const row = document.createElement('div');
-            row.className = 'bk-tier-expand-row';
-            row.innerHTML = `<span>${k}</span><span>${v}</span>`;
-            expand.appendChild(row);
-          });
-
+          // filter button
           const filterBtn = document.createElement('button');
           filterBtn.className = 'bk-tier-filter-btn';
-          filterBtn.textContent = `Filter to ${team.split(' ').pop()}`;
+          filterBtn.textContent = 'Filter';
           filterBtn.addEventListener('click', (e) => {
             e.stopPropagation();
             teamSelect.value = team;
             switchView('results');
             render();
           });
-          expand.appendChild(filterBtn);
+          row.appendChild(filterBtn);
 
-          chip.addEventListener('click', () => {
-            const isOpen = expand.classList.contains('open');
-            // close all other expands in this view
-            tiersViewEl.querySelectorAll('.bk-tier-expand.open').forEach(el => el.classList.remove('open'));
-            expand.classList.toggle('open', !isOpen);
-          });
-
-          chipWrap.appendChild(chip);
-          chipWrap.appendChild(expand);
-          teamsWrap.appendChild(chipWrap);
+          tiersViewEl.appendChild(row);
         });
-
-        band.appendChild(teamsWrap);
-        tiersViewEl.appendChild(band);
       });
 
       const note = document.createElement('div');
       note.className = 'bk-tier-note';
-      note.textContent = `Scored by auto/mem/insert count × hit odds${boxType ? ` (${boxType})` : ''}`;
+      note.textContent = `Ranked by auto/mem/insert count × pull odds${boxType ? ` · ${boxType} box` : ''}`;
       tiersViewEl.appendChild(note);
     }
 
