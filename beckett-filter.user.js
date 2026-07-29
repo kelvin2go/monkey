@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Beckett Card Filter
 // @namespace    https://github.com/kelvin2go/monkey
-// @version      4.5.3
+// @version      4.5.4
 // @description  Collapsible sidebar — filter by box, player, team, tab, and card type
 // @author       kelvin2go
 // @license      MIT
@@ -184,27 +184,27 @@
   // RC flag adds another ×1.5 on top (rookie demand premium)
   const STAR_PLAYERS = {
     // Tier 1 — transcendent demand (×5)
-    'LeBron James': 5, 'Stephen Curry': 5, 'Kevin Durant': 5,
-    'Giannis Antetokounmpo': 5, 'Luka Doncic': 5, 'Victor Wembanyama': 5,
-    'Nikola Jokic': 5,
+    'LeBron James': 7, 'Stephen Curry': 6, 'Kevin Durant': 3,
+    'Giannis Antetokounmpo': 3, 'Luka Doncic': 4, 'Victor Wembanyama': 5,
+    'Nikola Jokic': 4,
     // Tier 2 — all-stars / franchise cornerstones (×3)
-    'Jayson Tatum': 3, 'Devin Booker': 3, 'Anthony Edwards': 3,
-    'Ja Morant': 3, 'Zion Williamson': 3, 'Joel Embiid': 3,
-    'Kawhi Leonard': 3, 'Paul George': 3, 'Damian Lillard': 3,
-    'Karl-Anthony Towns': 3, 'Bam Adebayo': 3, 'Donovan Mitchell': 3,
-    'LaMelo Ball': 3, 'Shai Gilgeous-Alexander': 3, 'Trae Young': 3,
+    'Jayson Tatum': 3, 'Devin Booker': 2, 'Anthony Edwards': 3,
+    'Ja Morant': 2, 'Zion Williamson': 1, 'Joel Embiid': 1.5,
+    'Kawhi Leonard': 2, 'Paul George': 1.2, 'Damian Lillard': 1.2,
+    'Karl-Anthony Towns': 1.5, 'Bam Adebayo': 1.5, 'Donovan Mitchell': 1.3,
+    'LaMelo Ball': 1.3, 'Shai Gilgeous-Alexander': 3, 'Trae Young': 1.5,
     // 2025-26 top rookies
-    'Cooper Flagg': 4, 'Dylan Harper': 3.5, 'Ace Bailey': 2.8,
-    'Kon Knueppel': 2.8, 'Derik Queen': 2.8, 'Jeremiah Fears': 2.8,
+    'Cooper Flagg': 5, 'Dylan Harper': 3.5, 'Ace Bailey': 2.4,
+    'Kon Knueppel': 2.9, 'Derik Queen': 1.9, 'Jeremiah Fears': 2.1,
     // Tier 3 — solid demand (×1.8)
-    'Jimmy Butler': 1.8, 'Kyrie Irving': 1.8,
-    'Draymond Green': 1.8, 'Chris Paul': 1.8, 'Russell Westbrook': 1.8,
-    "De'Aaron Fox": 1.8, 'Tyrese Haliburton': 1.8, 'Paolo Banchero': 1.8,
-    'Cade Cunningham': 1.8, 'Evan Mobley': 1.8, 'Franz Wagner': 1.8,
-    'Scottie Barnes': 1.8, 'Jabari Smith': 1.8, 'Bennedict Mathurin': 1.8,
-    'Stephon Castle': 1.8, "Kel'el Ware": 1.8, 'Zaccharie Risacher': 1.8,
-    'Lauri Markkanen': 1.8, 'Brandon Miller': 1.8, 'Keyonte George': 1.8,
-    'Darius Garland': 1.8, 'Jalen Green': 1.8, 'Josh Giddey': 1.8,
+    'Jimmy Butler': 1.3, 'Kyrie Irving': 1.8,
+    'Draymond Green': 1.3, 'Chris Paul': 1.3, 'Russell Westbrook': 1.2,
+    "De'Aaron Fox": 1, 'Tyrese Haliburton': 2, 'Paolo Banchero': 1.8,
+    'Cade Cunningham': 2, 'Evan Mobley': 1.2, 'Franz Wagner': 1.3,
+    'Scottie Barnes': 1.8, 'Jabari Smith': 1.3, 'Bennedict Mathurin': 1.3,
+    'Stephon Castle': 1.8, "Kel'el Ware": 1.8, 'Zaccharie Risacher': 1.3,
+    'Lauri Markkanen': 1.8, 'Brandon Miller': 1.7, 'Keyonte George': 1.4,
+    'Darius Garland': 1.4, 'Jalen Green': 1.8, 'Josh Giddey': 1.5,
     'Alperen Sengun': 1.8, 'Ausar Thompson': 1.8, 'Amen Thompson': 1.8,
   };
 
@@ -766,6 +766,10 @@
       .bk-tier-pill-auto { background: #2d2200; color: #ffc130; }
       .bk-tier-pill-mem  { background: #1f0d2a; color: #c97dff; }
       .bk-tier-pill-ins  { background: #0d1f35; color: #5aadff; }
+      .bk-tier-score {
+        font-size: 10px; font-weight: 700; color: #8e8e93;
+        min-width: 28px; text-align: right; flex-shrink: 0;
+      }
       .bk-tier-badge {
         font-size: 10px; font-weight: 800; border-radius: 4px;
         padding: 2px 6px; flex-shrink: 0;
@@ -1569,6 +1573,13 @@
           }
           info.appendChild(counts);
           row.appendChild(info);
+
+          // score display
+          const scoreEl = document.createElement('span');
+          scoreEl.className = 'bk-tier-score';
+          scoreEl.textContent = scores[team] >= 10 ? Math.round(scores[team]) : scores[team].toFixed(1);
+          scoreEl.title = `Score: ${scores[team].toFixed(2)}`;
+          row.appendChild(scoreEl);
 
           // tier badge
           const badge = document.createElement('span');
