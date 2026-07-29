@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Beckett Card Filter
 // @namespace    https://github.com/kelvin2go/monkey
-// @version      4.5.1
+// @version      4.5.2
 // @description  Collapsible sidebar — filter by box, player, team, tab, and card type
 // @author       kelvin2go
 // @license      MIT
@@ -99,12 +99,14 @@
       ID_CARD_RE.lastIndex = 0;
       let m;
       while ((m = ID_CARD_RE.exec(line.trim())) !== null) {
+        const rc = RC_RE.test(m[2]); RC_RE.lastIndex = 0;
         const full = m[2].replace(RC_RE, '').replace(/\s*\/\d+\s*$/, '').trim();
         const lastComma = full.lastIndexOf(', ');
         cards.push({
           id: m[1],
           player: lastComma > 0 ? full.slice(0, lastComma) : full,
           team: lastComma > 0 ? full.slice(lastComma + 2) : '',
+          rc,
         });
       }
     }
@@ -119,12 +121,14 @@
       NUM_CARD_RE.lastIndex = 0;
       let m;
       while ((m = NUM_CARD_RE.exec(cleaned)) !== null) {
+        const rc = RC_RE.test(m[2]); RC_RE.lastIndex = 0;
         const full = m[2].replace(RC_RE, '').replace(/\s*\/\d+\s*$/, '').trim();
         const lastComma = full.lastIndexOf(', ');
         cards.push({
           id: m[1],
           player: lastComma > 0 ? full.slice(0, lastComma) : full,
           team:   lastComma > 0 ? full.slice(lastComma + 2) : '',
+          rc,
         });
       }
     }
@@ -176,15 +180,44 @@
   const TAB_WEIGHT = { autographs: 3, memorabilia: 2, inserts: 1 };
   const SERIAL_RE = /\/(\d+)/;
 
+  // Star player multipliers — tier 1 superstars ×5, tier 2 stars ×3, tier 3 quality ×1.8
+  // RC flag adds another ×1.5 on top (rookie demand premium)
+  const STAR_PLAYERS = {
+    // Tier 1 — transcendent demand (×5)
+    'LeBron James': 5, 'Stephen Curry': 5, 'Kevin Durant': 5,
+    'Giannis Antetokounmpo': 5, 'Luka Doncic': 5, 'Victor Wembanyama': 5,
+    'Nikola Jokic': 5,
+    // Tier 2 — all-stars / top rookies (×3)
+    'Jayson Tatum': 3, 'Devin Booker': 3, 'Anthony Edwards': 3,
+    'Ja Morant': 3, 'Zion Williamson': 3, 'Joel Embiid': 3,
+    'Kawhi Leonard': 3, 'Paul George': 3, 'Damian Lillard': 3,
+    'Karl-Anthony Towns': 3, 'Bam Adebayo': 3, 'Donovan Mitchell': 3,
+    'Cooper Flagg': 3, 'Ace Bailey': 3, 'Dylan Harper': 3,
+    'Kon Knueppel': 3, 'Derik Queen': 3, 'Jeremiah Fears': 3,
+    // Tier 3 — solid demand (×1.8)
+    'Jimmy Butler': 1.8, 'Trae Young': 1.8, 'Kyrie Irving': 1.8,
+    'Draymond Green': 1.8, 'Chris Paul': 1.8, 'Russell Westbrook': 1.8,
+    'De\'Aaron Fox': 1.8, 'Tyrese Haliburton': 1.8, 'Paolo Banchero': 1.8,
+    'Cade Cunningham': 1.8, 'Evan Mobley': 1.8, 'Franz Wagner': 1.8,
+    'Scottie Barnes': 1.8, 'Jabari Smith': 1.8, 'Bennedict Mathurin': 1.8,
+    'Stephon Castle': 1.8, "Kel'el Ware": 1.8, 'Zaccharie Risacher': 1.8,
+  };
+
+  function playerMultiplier(playerName, isRc) {
+    const star = STAR_PLAYERS[playerName] || 1;
+    const rcBonus = isRc ? 1.5 : 1;
+    return star * rcBonus;
+  }
+
   function scoreTeams(sections, boxType) {
     const scores = {};
-    const detail = {}; // team → { autos, mem, inserts, score }
+    const detail = {}; // team → { autos, mem, inserts }
 
     sections.forEach((s) => {
       const tabKey = s.tabName.toLowerCase().replace(/\s+/g, '');
       const baseWeight = Object.entries(TAB_WEIGHT).find(([k]) => tabKey.includes(k))?.[1] ?? 1;
       const odds = boxType && s.odds[boxType] ? s.odds[boxType] : null;
-      const oddsMultiplier = odds ? (1 / odds) * 100 : 1; // scale so 1:10 ≈ 10, 1:36 ≈ 2.8
+      const oddsMultiplier = odds ? (1 / odds) * 100 : 1;
 
       // serial number from section title (e.g. "Gold /10")
       const serialMatch = s.title.match(SERIAL_RE);
@@ -192,9 +225,10 @@
 
       s.cards.forEach((c) => {
         const teams = c.team ? c.team.split('/').map(t => t.trim()).filter(Boolean) : [];
+        const playerMult = playerMultiplier(c.player, c.rc);
         teams.forEach((team) => {
           if (!scores[team]) { scores[team] = 0; detail[team] = { autos: 0, mem: 0, inserts: 0 }; }
-          const cardValue = baseWeight * oddsMultiplier * serialMultiplier;
+          const cardValue = baseWeight * oddsMultiplier * serialMultiplier * playerMult;
           scores[team] += cardValue;
           if (tabKey.includes('autograph')) detail[team].autos++;
           else if (tabKey.includes('memorabilia')) detail[team].mem++;
