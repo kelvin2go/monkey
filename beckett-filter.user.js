@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Beckett Card Filter
 // @namespace    https://github.com/kelvin2go/monkey
-// @version      4.4.5
+// @version      4.4.6
 // @description  Collapsible sidebar — filter by box, player, team, tab, and card type
 // @author       kelvin2go
 // @license      MIT
@@ -83,7 +83,11 @@
       let m;
       while ((m = ODDS_RE.exec(line)) !== null) {
         const v = parseInt(m[2].replace(/,/g, ''), 10);
-        if (isFinite(v) && !odds[m[1]]) odds[m[1]] = v;
+        // Strip leading garbage jammed against the type word (e.g. "cardsHobby" → "Hobby")
+        // when a card count like "20 cards" runs into the type name without a separator.
+        const typeMatch = m[1].match(/(Hobby|Jumbo|Value|Mega)$/i);
+        const key = typeMatch ? typeMatch[1] : m[1];
+        if (isFinite(v) && !odds[key]) odds[key] = v;
       }
     }
     return odds;
