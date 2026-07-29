@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Beckett Card Filter
 // @namespace    https://github.com/kelvin2go/monkey
-// @version      4.4.7
+// @version      4.5.0
 // @description  Collapsible sidebar — filter by box, player, team, tab, and card type
 // @author       kelvin2go
 // @license      MIT
@@ -170,6 +170,60 @@
     const rate = packsPerBox / oddsPerPack;
     if (rate >= 1) return `~${rate.toFixed(1)}x / box`;
     return `1 per ${Math.round(1 / rate)} boxes`;
+  }
+
+  // ─── Team tier scoring ────────────────────────────────────────────────────────
+  const TAB_WEIGHT = { autographs: 3, memorabilia: 2, inserts: 1 };
+  const SERIAL_RE = /\/(\d+)/;
+
+  function scoreTeams(sections, boxType) {
+    const scores = {};
+    const detail = {}; // team → { autos, mem, inserts, score }
+
+    sections.forEach((s) => {
+      const tabKey = s.tabName.toLowerCase().replace(/\s+/g, '');
+      const baseWeight = Object.entries(TAB_WEIGHT).find(([k]) => tabKey.includes(k))?.[1] ?? 1;
+      const odds = boxType && s.odds[boxType] ? s.odds[boxType] : null;
+      const oddsMultiplier = odds ? (1 / odds) * 100 : 1; // scale so 1:10 ≈ 10, 1:36 ≈ 2.8
+
+      // serial number from section title (e.g. "Gold /10")
+      const serialMatch = s.title.match(SERIAL_RE);
+      const serialMultiplier = serialMatch ? Math.min(1 + 50 / parseInt(serialMatch[1], 10), 8) : 1;
+
+      s.cards.forEach((c) => {
+        const teams = c.team ? c.team.split('/').map(t => t.trim()).filter(Boolean) : [];
+        teams.forEach((team) => {
+          if (!scores[team]) { scores[team] = 0; detail[team] = { autos: 0, mem: 0, inserts: 0 }; }
+          const cardValue = baseWeight * oddsMultiplier * serialMultiplier;
+          scores[team] += cardValue;
+          if (tabKey.includes('autograph')) detail[team].autos++;
+          else if (tabKey.includes('memorabilia')) detail[team].mem++;
+          else detail[team].inserts++;
+        });
+      });
+    });
+
+    // percentile-based tiers across however many teams exist
+    const teams = Object.keys(scores).sort((a, b) => scores[b] - scores[a]);
+    const n = teams.length;
+    const TIER_BANDS = [
+      { label: 'S', color: '#e63c14', bg: '#2d0e06', pct: 0.10 },
+      { label: 'A', color: '#ffc130', bg: '#2d2200', pct: 0.25 },
+      { label: 'B', color: '#5ac85a', bg: '#1a2d1a', pct: 0.50 },
+      { label: 'C', color: '#5aadff', bg: '#0d1f2d', pct: 0.75 },
+      { label: 'D', color: '#8e8e93', bg: '#1c1c1e', pct: 1.00 },
+    ];
+
+    const tiered = [];
+    let prevCutoff = 0;
+    TIER_BANDS.forEach(({ label, color, bg, pct }) => {
+      const cutoff = Math.round(n * pct);
+      const slice = teams.slice(prevCutoff, cutoff);
+      if (slice.length) tiered.push({ label, color, bg, teams: slice });
+      prevCutoff = cutoff;
+    });
+
+    return { tiered, scores, detail };
   }
 
   // ─── Styles ───────────────────────────────────────────────────────────────────
@@ -597,6 +651,45 @@
         box-shadow: 0 4px 12px rgba(0,0,0,0.5);
       }
       #bk-bd-autocomplete:empty { display: none; }
+      #bk-tiers-area {
+        flex: 1; overflow-y: auto; padding: 10px 14px 24px; display: none;
+        flex-direction: column; gap: 10px;
+      }
+      #bk-tiers-area.active { display: flex; }
+      #bk-tiers-area::-webkit-scrollbar { width: 4px; }
+      #bk-tiers-area::-webkit-scrollbar-thumb { background: #48484a; border-radius: 2px; }
+      .bk-tier-band { display: flex; align-items: flex-start; gap: 10px; }
+      .bk-tier-letter {
+        width: 28px; height: 28px; border-radius: 6px; display: flex;
+        align-items: center; justify-content: center;
+        font-size: 14px; font-weight: 800; flex-shrink: 0; margin-top: 2px;
+      }
+      .bk-tier-teams { display: flex; flex-wrap: wrap; gap: 5px; flex: 1; }
+      .bk-tier-chip {
+        display: inline-flex; align-items: center; gap: 5px;
+        border-radius: 8px; border: 1px solid; padding: 4px 8px;
+        font-size: 11px; font-weight: 600; cursor: pointer;
+        transition: opacity 0.15s;
+      }
+      .bk-tier-chip:hover { opacity: 0.8; }
+      .bk-tier-chip-counts {
+        font-size: 10px; font-weight: 400; opacity: 0.75;
+      }
+      .bk-tier-expand {
+        margin-top: 6px; background: #232325; border-radius: 8px;
+        padding: 8px 10px; font-size: 11px; display: none; flex-direction: column; gap: 4px;
+        border: 1px solid #3a3a3c;
+      }
+      .bk-tier-expand.open { display: flex; }
+      .bk-tier-expand-row { display: flex; justify-content: space-between; color: #aeaeb2; }
+      .bk-tier-expand-row span:last-child { font-weight: 600; color: #f2f2f7; }
+      .bk-tier-filter-btn {
+        margin-top: 6px; background: #e63c14; border: none; border-radius: 6px;
+        color: #fff; font-size: 11px; font-weight: 700; padding: 5px 10px;
+        cursor: pointer; align-self: flex-start;
+      }
+      .bk-tier-filter-btn:hover { background: #c0320f; }
+      .bk-tier-note { font-size: 10px; color: #48484a; text-align: center; padding-top: 4px; }
     `);
   }
 
@@ -626,6 +719,7 @@
         <div id="bk-view-tabs">
           <button class="bk-view-tab active" data-view="results">📋 Results</button>
           <button class="bk-view-tab" data-view="breakdown">📊 Breakdown</button>
+          <button class="bk-view-tab" data-view="tiers">🏆 Tiers</button>
         </div>
         <div class="bk-box-row" id="bk-box-row"></div>
         <div id="bk-filters">
@@ -676,6 +770,7 @@
         </div>
         <div id="bk-bd-table-wrap"></div>
       </div>
+      <div id="bk-tiers-area"></div>
     `;
     document.body.appendChild(sidebar);
 
@@ -1001,6 +1096,7 @@
     let currentView = 'results';
     const resultsViewEl = sidebar.querySelector('#bk-results');
     const breakdownViewEl = sidebar.querySelector('#bk-breakdown-area');
+    const tiersViewEl = sidebar.querySelector('#bk-tiers-area');
     const bdSearchEl = sidebar.querySelector('#bk-breakdown-search');
     const bdTableWrap = sidebar.querySelector('#bk-bd-table-wrap');
     const bdTagsEl = sidebar.querySelector('#bk-bd-player-tags');
@@ -1026,11 +1122,16 @@
     const cmpA = sidebar.querySelector('#bk-cmp-a');
     const cmpB = sidebar.querySelector('#bk-cmp-b');
 
+    function switchView(view) {
+      currentView = view;
+      sidebar.querySelectorAll('.bk-view-tab').forEach(b => b.classList.toggle('active', b.dataset.view === view));
+      resultsViewEl.style.display = view === 'results' ? '' : 'none';
+      breakdownViewEl.classList.toggle('active', view === 'breakdown');
+      tiersViewEl.classList.toggle('active', view === 'tiers');
+    }
+
     function switchToResults() {
-      currentView = 'results';
-      sidebar.querySelectorAll('.bk-view-tab').forEach(b => b.classList.toggle('active', b.dataset.view === 'results'));
-      resultsViewEl.style.display = '';
-      breakdownViewEl.classList.remove('active');
+      switchView('results');
     }
 
     function goToResultsWithPlayer(playerName) {
@@ -1063,11 +1164,9 @@
 
     sidebar.querySelectorAll('.bk-view-tab').forEach((btn) => {
       btn.addEventListener('click', () => {
-        currentView = btn.dataset.view;
-        sidebar.querySelectorAll('.bk-view-tab').forEach(b => b.classList.toggle('active', b === btn));
-        resultsViewEl.style.display = currentView === 'results' ? '' : 'none';
-        breakdownViewEl.classList.toggle('active', currentView === 'breakdown');
+        switchView(btn.dataset.view);
         if (currentView === 'breakdown') renderBreakdown();
+        if (currentView === 'tiers') renderTiers();
       });
     });
 
@@ -1302,6 +1401,110 @@
       renderBreakdownTable(tabCols, playerMap, playerTeams, bdSearchEl.value.trim(), null);
     }
 
+    function renderTiers() {
+      tiersViewEl.innerHTML = '';
+      const base = getBaseSections().filter((s) => !SKIP_TYPE.test(s.title) && !SKIP_TYPE.test(s.tabName));
+      const boxType = currentBoxType === 'all-inserts' ? null : currentBoxType;
+      const { tiered, scores, detail } = scoreTeams(base, boxType);
+
+      if (!tiered.length) {
+        tiersViewEl.innerHTML = '<div class="bk-empty">Not enough team data to rank.</div>';
+        return;
+      }
+
+      tiered.forEach(({ label, color, bg, teams }) => {
+        const band = document.createElement('div');
+        band.className = 'bk-tier-band';
+
+        const letter = document.createElement('div');
+        letter.className = 'bk-tier-letter';
+        letter.textContent = label;
+        letter.style.cssText = `background:${bg};color:${color};border:1px solid ${color}`;
+        band.appendChild(letter);
+
+        const teamsWrap = document.createElement('div');
+        teamsWrap.className = 'bk-tier-teams';
+
+        teams.forEach((team) => {
+          const d = detail[team] || { autos: 0, mem: 0, inserts: 0 };
+          const chipWrap = document.createElement('div');
+          chipWrap.style.cssText = 'display:flex;flex-direction:column;gap:0';
+
+          const chip = document.createElement('div');
+          chip.className = 'bk-tier-chip';
+          chip.style.cssText = `background:${bg};color:${color};border-color:${color}`;
+
+          const abbrev = team.replace(/^(.*)\s(\S+)$/, (_, rest, last) => {
+            const words = rest.split(' ');
+            return words.map(w => w[0]).join('') + last.slice(0, 3);
+          }).toUpperCase().slice(0, 6);
+
+          const nameSpan = document.createElement('span');
+          nameSpan.textContent = abbrev;
+          nameSpan.title = team;
+
+          const countsSpan = document.createElement('span');
+          countsSpan.className = 'bk-tier-chip-counts';
+          const parts = [];
+          if (d.autos) parts.push(`${d.autos}A`);
+          if (d.mem) parts.push(`${d.mem}M`);
+          if (d.inserts) parts.push(`${d.inserts}I`);
+          countsSpan.textContent = parts.join('/');
+
+          chip.appendChild(nameSpan);
+          if (parts.length) chip.appendChild(countsSpan);
+
+          // expand panel
+          const expand = document.createElement('div');
+          expand.className = 'bk-tier-expand';
+
+          const rows = [
+            ['Team', team],
+            ['Autos', d.autos],
+            ['Memorabilia', d.mem],
+            ['Inserts', d.inserts],
+            ['Score', scores[team].toFixed(1)],
+          ];
+          rows.forEach(([k, v]) => {
+            const row = document.createElement('div');
+            row.className = 'bk-tier-expand-row';
+            row.innerHTML = `<span>${k}</span><span>${v}</span>`;
+            expand.appendChild(row);
+          });
+
+          const filterBtn = document.createElement('button');
+          filterBtn.className = 'bk-tier-filter-btn';
+          filterBtn.textContent = `Filter to ${team.split(' ').pop()}`;
+          filterBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            teamSelect.value = team;
+            switchView('results');
+            render();
+          });
+          expand.appendChild(filterBtn);
+
+          chip.addEventListener('click', () => {
+            const isOpen = expand.classList.contains('open');
+            // close all other expands in this view
+            tiersViewEl.querySelectorAll('.bk-tier-expand.open').forEach(el => el.classList.remove('open'));
+            expand.classList.toggle('open', !isOpen);
+          });
+
+          chipWrap.appendChild(chip);
+          chipWrap.appendChild(expand);
+          teamsWrap.appendChild(chipWrap);
+        });
+
+        band.appendChild(teamsWrap);
+        tiersViewEl.appendChild(band);
+      });
+
+      const note = document.createElement('div');
+      note.className = 'bk-tier-note';
+      note.textContent = `Scored by auto/mem/insert count × hit odds${boxType ? ` (${boxType})` : ''}`;
+      tiersViewEl.appendChild(note);
+    }
+
     function bdTagColor(name) {
       return BD_TAG_PALETTE[bdPlayerTags.get(name) % BD_TAG_PALETTE.length];
     }
@@ -1423,6 +1626,7 @@
     function renderActive() {
       render();
       if (currentView === 'breakdown') renderBreakdown();
+      if (currentView === 'tiers') renderTiers();
     }
 
     // restore defaults now that all state vars and render fns are declared
