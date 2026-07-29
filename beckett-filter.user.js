@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Beckett Card Filter
 // @namespace    https://github.com/kelvin2go/monkey
-// @version      4.5.4
+// @version      4.5.5
 // @description  Collapsible sidebar — filter by box, player, team, tab, and card type
 // @author       kelvin2go
 // @license      MIT
@@ -360,6 +360,10 @@
         color: #e63c14;
         letter-spacing: 1px;
         text-transform: uppercase;
+      }
+      #bk-version {
+        font-size: 9px; font-weight: 400; color: #48484a;
+        letter-spacing: 0; text-transform: none; vertical-align: middle;
       }
       .bk-box-row {
         display: flex;
@@ -806,7 +810,7 @@
     sidebar.innerHTML = `
       <div id="bk-resize"></div>
       <div id="bk-sidebar-head">
-        <h2>🃏 Card Filter</h2>
+        <h2>🃏 Card Filter <span id="bk-version"></span></h2>
         <div id="bk-view-tabs">
           <button class="bk-view-tab active" data-view="results">📋 Results</button>
           <button class="bk-view-tab" data-view="breakdown">📊 Breakdown</button>
@@ -864,6 +868,9 @@
       <div id="bk-tiers-area"></div>
     `;
     document.body.appendChild(sidebar);
+
+    const vEl = sidebar.querySelector('#bk-version');
+    if (vEl) vEl.textContent = `v${GM_info.script.version}`;
 
     const boxRow = sidebar.querySelector('#bk-box-row');
     const searchInput = sidebar.querySelector('#bk-search');
